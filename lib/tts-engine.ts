@@ -18,6 +18,9 @@ export type PlayRequest = {
   startIndex?: number
 }
 
+export const NO_VOICES_MESSAGE =
+  "No system voices showed up. Install an English voice in your OS speech settings, then reload."
+
 const idleSnapshot: TtsSnapshot = {
   status: "idle",
   replyId: null,
@@ -99,6 +102,27 @@ export class TtsEngine {
 
     this.chunks = chunks
     this.remainder = ""
+    const my = ++this.generation
+    void this.beginPlayback(request, chunks, my)
+  }
+
+  private async beginPlayback(
+    request: PlayRequest,
+    chunks: string[],
+    my: number
+  ) {
+    const voices = await waitForVoices(600)
+    if (my !== this.generation) return
+    if (voices.length === 0) {
+      this.chunks = []
+      this.replace({
+        ...idleSnapshot,
+        supported: true,
+        error: NO_VOICES_MESSAGE,
+      })
+      return
+    }
+
     this.replace({
       status: "playing",
       replyId: request.replyId,
@@ -230,10 +254,14 @@ export class TtsEngine {
     utterance.onerror = (event) => {
       if (my !== this.generation) return
       if (event.error === "interrupted" || event.error === "canceled") return
+      this.generation += 1
+      this.chunks = []
+      this.remainder = ""
       this.stopKeepAlive()
+      getSynth()?.cancel()
       this.replace({
-        ...this.snapshot,
-        status: "idle",
+        ...idleSnapshot,
+        supported: this.snapshot.supported,
         error: humanizeSpeechError(event.error),
       })
     }
@@ -277,7 +305,29 @@ export class TtsEngine {
   }
 }
 
+function waitForVoices(timeoutMs: number): Promise<SpeechSynthesisVoice[]> {
+  const synth = getSynth()
+  if (!synth) return Promise.resolve([])
+  const existing = synth.getVoices()
+  if (existing.length > 0) return Promise.resolve(existing)
+
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      synth.removeEventListener("voiceschanged", finish)
+      resolve(synth.getVoices())
+    }
+    synth.addEventListener("voiceschanged", finish)
+    window.setTimeout(finish, timeoutMs)
+  })
+}
+
 function humanizeSpeechError(error: string) {
+  if (getSynth()?.getVoices().length === 0) {
+    return NO_VOICES_MESSAGE
+  }
   if (error === "not-allowed") {
     return "The browser blocked speech. Click play again after interacting with the page."
   }

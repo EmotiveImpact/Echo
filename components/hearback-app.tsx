@@ -19,7 +19,7 @@ import {
 } from "@/lib/hearback-store"
 import { SAMPLE_REPLY } from "@/lib/sample-reply"
 import { buildSpeakable } from "@/lib/speakable"
-import { tts } from "@/lib/tts-engine"
+import { NO_VOICES_MESSAGE, tts } from "@/lib/tts-engine"
 import { useTts } from "@/hooks/use-tts"
 import { useVoices } from "@/hooks/use-voices"
 
@@ -149,7 +149,9 @@ export function HearbackApp() {
   }, [snapshot.chunkIndex, snapshot.replyId, snapshot.status])
 
   useEffect(() => {
-    if (snapshot.error) toast.error(snapshot.error)
+    if (!snapshot.error) return
+    if (snapshot.error === NO_VOICES_MESSAGE) return
+    toast.error(snapshot.error)
   }, [snapshot.error])
 
   return (
@@ -195,8 +197,7 @@ export function HearbackApp() {
 
           {voicesReady && voices.length === 0 && snapshot.supported ? (
             <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
-              No system voices showed up. Install an English voice in your OS
-              speech settings, then reload.
+              {NO_VOICES_MESSAGE}
             </div>
           ) : null}
 
