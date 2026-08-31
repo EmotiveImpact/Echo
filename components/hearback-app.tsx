@@ -19,7 +19,7 @@ import {
 } from "@/lib/hearback-store"
 import { SAMPLE_REPLY } from "@/lib/sample-reply"
 import { buildSpeakable } from "@/lib/speakable"
-import { NO_VOICES_MESSAGE, tts } from "@/lib/tts-engine"
+import { tts } from "@/lib/tts-engine"
 import { useTts } from "@/hooks/use-tts"
 import { useVoices } from "@/hooks/use-voices"
 
@@ -30,7 +30,7 @@ export function HearbackApp() {
     getHearbackSnapshot,
     getHearbackServerSnapshot
   )
-  const { voices, ready: voicesReady } = useVoices()
+  const { voices } = useVoices()
   const { replies, settings } = store
   const snapshotRef = useRef(snapshot)
   const repliesRef = useRef(replies)
@@ -149,9 +149,7 @@ export function HearbackApp() {
   }, [snapshot.chunkIndex, snapshot.replyId, snapshot.status])
 
   useEffect(() => {
-    if (!snapshot.error) return
-    if (snapshot.error === NO_VOICES_MESSAGE) return
-    toast.error(snapshot.error)
+    if (snapshot.error) toast.error(snapshot.error)
   }, [snapshot.error])
 
   return (
@@ -172,7 +170,7 @@ export function HearbackApp() {
             </div>
           </div>
           <p className="hidden text-xs text-muted-foreground sm:block">
-            Local browser voices · nothing leaves this machine
+            Neural voices play through the page — no OS voice install
           </p>
         </div>
       </header>
@@ -185,21 +183,7 @@ export function HearbackApp() {
         <main className="min-w-0 flex-1 space-y-4">
           <PasteComposer
             onListen={(text) => listen(text)}
-            disabled={!snapshot.supported}
           />
-
-          {!snapshot.supported ? (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm">
-              This browser has no speech engine. Open Hearback in Chrome, Edge, or
-              Safari to hear replies.
-            </div>
-          ) : null}
-
-          {voicesReady && voices.length === 0 && snapshot.supported ? (
-            <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground">
-              {NO_VOICES_MESSAGE}
-            </div>
-          ) : null}
 
           {replies.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-card/40 px-6 py-12 text-center">
@@ -262,7 +246,6 @@ export function HearbackApp() {
           rate={settings.rate}
           voiceURI={voiceURI}
           voices={voices}
-          voicesReady={voicesReady}
           skipCode={settings.skipCode}
           skipUrls={settings.skipUrls}
           supported={snapshot.supported}

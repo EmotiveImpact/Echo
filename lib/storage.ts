@@ -1,3 +1,5 @@
+import { DEFAULT_VOICE } from "@/lib/neural-voices"
+
 export type SavedReply = {
   id: string
   createdAt: number
@@ -16,11 +18,11 @@ export type HearbackStore = {
   settings: HearbackSettings
 }
 
-const KEY = "hearback:v1"
+const KEY = "hearback:v2"
 const MAX_REPLIES = 40
 
 export const defaultSettings: HearbackSettings = {
-  voiceURI: null,
+  voiceURI: DEFAULT_VOICE,
   rate: 1.05,
   skipCode: true,
   skipUrls: true,

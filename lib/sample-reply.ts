@@ -7,7 +7,7 @@ Until that exists, this companion is the same interaction:
 3. Hit play, and listen instead of reading the wall of text.
 
 What this player does on purpose:
-- Uses your browser's built-in voices. Nothing is sent to a TTS API, and you do not need a key.
+- Synthesizes neural audio and plays it in the page, so you actually hear the reply.
 - Skips fenced code by default. Hearing \`const value = 1\` read aloud is why people turn speech off.
 - Highlights the sentence currently being spoken so you can glance back at the screen without losing your place.
 

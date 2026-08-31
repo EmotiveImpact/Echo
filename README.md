@@ -2,7 +2,7 @@
 
 Click play on a Cursor agent reply and hear it back — the same interaction ChatGPT and Claude give you, without waiting for Cursor to ship a speaker icon on chat bubbles.
 
-Cursor does not expose a public API for injecting controls into Agent chat. That is why this lives beside the editor instead of inside it. The audio itself is the easy part: the browser already has a speech engine.
+Cursor does not expose a public API for injecting controls into Agent chat. Hearback sits beside the editor and plays real MP3 audio in the page. It does not use the browser `speechSynthesis` API, which often fails silently.
 
 ## How to use it with Cursor
 
@@ -29,7 +29,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:4317](http://localhost:4317). Use Chrome, Edge, or Safari — they ship a speech engine. Voices stay on your machine; nothing is sent to a TTS API.
+Open [http://localhost:4317](http://localhost:4317). Playback uses neural voices through `/api/tts` (no API key). The machine running Next.js needs outbound access to Microsoft Edge TTS.
 
 ```bash
 npm test

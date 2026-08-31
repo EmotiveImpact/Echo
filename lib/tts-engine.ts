@@ -1,6 +1,6 @@
-import { findVoice } from "@/lib/voices"
+import { DEFAULT_VOICE } from "@/lib/neural-voices"
 
-export type TtsStatus = "idle" | "playing" | "paused"
+export type TtsStatus = "idle" | "loading" | "playing" | "paused"
 
 export type TtsSnapshot = {
   status: TtsStatus
@@ -18,9 +18,6 @@ export type PlayRequest = {
   startIndex?: number
 }
 
-export const NO_VOICES_MESSAGE =
-  "No system voices showed up. Install an English voice in your OS speech settings, then reload."
-
 const idleSnapshot: TtsSnapshot = {
   status: "idle",
   replyId: null,
@@ -31,29 +28,19 @@ const idleSnapshot: TtsSnapshot = {
   supported: true,
 }
 
-function getSynth(): SpeechSynthesis | null {
-  if (typeof window === "undefined") return null
-  return window.speechSynthesis ?? null
-}
+const SILENCE =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"
 
 export class TtsEngine {
   private listeners = new Set<() => void>()
   private snapshot: TtsSnapshot = idleSnapshot
   private chunks: string[] = []
   private generation = 0
-  private keepAlive: ReturnType<typeof setInterval> | null = null
-  private remainder = ""
   private rate = 1
-  private voiceURI: string | null = null
-
-  constructor() {
-    if (typeof window !== "undefined") {
-      this.snapshot = {
-        ...idleSnapshot,
-        supported: "speechSynthesis" in window,
-      }
-    }
-  }
+  private voiceURI: string = DEFAULT_VOICE
+  private audio: HTMLAudioElement | null = null
+  private ctx: AudioContext | null = null
+  private cache = new Map<string, string>()
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener)
@@ -68,29 +55,22 @@ export class TtsEngine {
 
   setRate(rate: number) {
     this.rate = rate
-    if (this.snapshot.status === "playing") {
-      this.speakAt(this.snapshot.chunkIndex, true)
-    }
+    if (this.audio) this.audio.playbackRate = rate
   }
 
   setVoice(uri: string | null) {
-    this.voiceURI = uri
-    if (this.snapshot.status === "playing") {
-      this.speakAt(this.snapshot.chunkIndex, true)
+    const next = uri || DEFAULT_VOICE
+    if (next === this.voiceURI) return
+    this.voiceURI = next
+    this.clearCache()
+    if (this.snapshot.status === "playing" || this.snapshot.status === "loading") {
+      this.generation += 1
+      void this.playIndex(this.snapshot.chunkIndex)
     }
   }
 
   play(request: PlayRequest) {
-    const synth = getSynth()
-    if (!synth) {
-      this.replace({
-        ...idleSnapshot,
-        supported: false,
-        error: "This browser has no speech engine. Use Chrome, Edge, or Safari.",
-      })
-      return
-    }
-
+    this.prime()
     const chunks = request.chunks.filter((chunk) => chunk.trim().length > 0)
     if (chunks.length === 0) {
       this.replace({
@@ -101,30 +81,9 @@ export class TtsEngine {
     }
 
     this.chunks = chunks
-    this.remainder = ""
-    const my = ++this.generation
-    void this.beginPlayback(request, chunks, my)
-  }
-
-  private async beginPlayback(
-    request: PlayRequest,
-    chunks: string[],
-    my: number
-  ) {
-    const voices = await waitForVoices(600)
-    if (my !== this.generation) return
-    if (voices.length === 0) {
-      this.chunks = []
-      this.replace({
-        ...idleSnapshot,
-        supported: true,
-        error: NO_VOICES_MESSAGE,
-      })
-      return
-    }
-
+    this.generation += 1
     this.replace({
-      status: "playing",
+      status: "loading",
       replyId: request.replyId,
       chunkIndex: request.startIndex ?? 0,
       chunkCount: chunks.length,
@@ -132,44 +91,57 @@ export class TtsEngine {
       error: null,
       supported: true,
     })
-    this.speakAt(this.snapshot.chunkIndex, false)
+    void this.playIndex(this.snapshot.chunkIndex)
   }
 
   pause() {
-    if (this.snapshot.status !== "playing") return
+    if (this.snapshot.status !== "playing" && this.snapshot.status !== "loading") return
     this.generation += 1
-    this.stopKeepAlive()
-    getSynth()?.cancel()
+    this.audio?.pause()
     this.replace({ ...this.snapshot, status: "paused" })
   }
 
   resume() {
     if (this.snapshot.status !== "paused") return
-    this.replace({ ...this.snapshot, status: "playing" })
-    this.speakAt(this.snapshot.chunkIndex, true)
+    this.prime()
+    this.generation += 1
+    const my = this.generation
+    const audio = this.audio
+    const index = this.snapshot.chunkIndex
+    if (audio?.src && audio.src !== SILENCE && audio.currentTime > 0 && !audio.ended) {
+      audio.onended = () => {
+        if (my !== this.generation) return
+        this.generation += 1
+        void this.playIndex(index + 1)
+      }
+      this.replace({ ...this.snapshot, status: "playing" })
+      void audio.play().catch((error) => {
+        if (my !== this.generation) return
+        this.fail(error)
+      })
+      return
+    }
+    this.replace({ ...this.snapshot, status: "loading" })
+    void this.playIndex(index)
   }
 
   stop() {
     this.generation += 1
     this.chunks = []
-    this.remainder = ""
-    this.stopKeepAlive()
-    getSynth()?.cancel()
-    this.replace({ ...idleSnapshot, supported: this.snapshot.supported })
+    if (this.audio) {
+      this.audio.pause()
+      this.audio.removeAttribute("src")
+      this.audio.load()
+    }
+    this.replace({ ...idleSnapshot })
   }
 
   toggle(request: PlayRequest) {
-    if (
-      this.snapshot.replyId === request.replyId &&
-      this.snapshot.status === "playing"
-    ) {
+    if (this.snapshot.replyId === request.replyId && this.snapshot.status === "playing") {
       this.pause()
       return
     }
-    if (
-      this.snapshot.replyId === request.replyId &&
-      this.snapshot.status === "paused"
-    ) {
+    if (this.snapshot.replyId === request.replyId && this.snapshot.status === "paused") {
       this.resume()
       return
     }
@@ -182,162 +154,160 @@ export class TtsEngine {
       this.snapshot.chunkIndex + 1,
       Math.max(this.chunks.length - 1, 0)
     )
-    this.remainder = ""
-    if (this.snapshot.status === "paused") {
-      this.replace({ ...this.snapshot, chunkIndex: nextIndex, charIndex: 0 })
-      return
-    }
-    this.replace({ ...this.snapshot, chunkIndex: nextIndex, charIndex: 0 })
-    this.speakAt(nextIndex, false)
+    this.generation += 1
+    this.audio?.pause()
+    void this.playIndex(nextIndex)
   }
 
   prev() {
     if (!this.snapshot.replyId) return
     const prevIndex = Math.max(this.snapshot.chunkIndex - 1, 0)
-    this.remainder = ""
-    if (this.snapshot.status === "paused") {
-      this.replace({ ...this.snapshot, chunkIndex: prevIndex, charIndex: 0 })
-      return
-    }
-    this.replace({ ...this.snapshot, chunkIndex: prevIndex, charIndex: 0 })
-    this.speakAt(prevIndex, false)
+    this.generation += 1
+    this.audio?.pause()
+    void this.playIndex(prevIndex)
   }
 
-  private speakAt(index: number, useRemainder: boolean) {
-    const synth = getSynth()
-    if (!synth) return
+  private prime() {
+    if (typeof window === "undefined") return
+    const audio = this.ensureAudio()
+    try {
+      const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (Ctor && !this.ctx) this.ctx = new Ctor()
+      void this.ctx?.resume()
+    } catch {
+      // Some browsers expose HTMLAudioElement only.
+    }
+    if (!audio.src) {
+      audio.src = SILENCE
+      void audio.play().catch(() => undefined)
+    }
+  }
 
+  private ensureAudio() {
+    if (this.audio) return this.audio
+    const audio = new Audio()
+    audio.preload = "auto"
+    this.audio = audio
+    return audio
+  }
+
+  private async playIndex(index: number) {
+    const my = this.generation
     if (index >= this.chunks.length) {
       this.stop()
       return
     }
 
-    this.generation += 1
-    const my = this.generation
-    synth.cancel()
-
-    const full = this.chunks[index] ?? ""
-    const text = useRemainder && this.remainder ? this.remainder : full
-    this.remainder = text
-    const offset = full.length - text.length
-
-    const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = this.rate
-    utterance.pitch = 1
-    utterance.volume = 1
-    const voice = findVoice(this.voiceURI)
-    if (voice) utterance.voice = voice
-
-    utterance.onboundary = (event) => {
-      if (my !== this.generation) return
-      if (typeof event.charIndex !== "number") return
-      this.remainder = text.slice(event.charIndex)
-      this.replace({
-        ...this.snapshot,
-        charIndex: offset + event.charIndex,
-      })
-    }
-
-    utterance.onend = () => {
-      if (my !== this.generation) return
-      this.remainder = ""
-      this.speakAt(index + 1, false)
-      if (index + 1 < this.chunks.length) {
-        this.replace({
-          ...this.snapshot,
-          chunkIndex: index + 1,
-          charIndex: 0,
-        })
-      }
-    }
-
-    utterance.onerror = (event) => {
-      if (my !== this.generation) return
-      if (event.error === "interrupted" || event.error === "canceled") return
-      this.generation += 1
-      this.chunks = []
-      this.remainder = ""
-      this.stopKeepAlive()
-      getSynth()?.cancel()
-      this.replace({
-        ...idleSnapshot,
-        supported: this.snapshot.supported,
-        error: humanizeSpeechError(event.error),
-      })
-    }
-
+    const text = this.chunks[index] ?? ""
     this.replace({
       ...this.snapshot,
-      status: "playing",
+      status: "loading",
       chunkIndex: index,
       chunkCount: this.chunks.length,
-      charIndex: offset,
+      charIndex: 0,
       error: null,
     })
-    this.startKeepAlive()
-    window.setTimeout(() => {
+
+    try {
+      const url = await this.getUrl(text)
       if (my !== this.generation) return
-      getSynth()?.speak(utterance)
-    }, 20)
-  }
-
-  private startKeepAlive() {
-    this.stopKeepAlive()
-    this.keepAlive = setInterval(() => {
-      const synth = getSynth()
-      if (!synth) return
-      if (this.snapshot.status === "playing" && synth.speaking) {
-        synth.resume()
+      const audio = this.ensureAudio()
+      audio.pause()
+      audio.onended = null
+      audio.onerror = null
+      audio.src = url
+      audio.playbackRate = this.rate
+      audio.onended = () => {
+        if (my !== this.generation) return
+        this.generation += 1
+        void this.playIndex(index + 1)
       }
-    }, 8000)
+      audio.onerror = () => {
+        if (my !== this.generation) return
+        this.fail(new Error("The audio element could not play that clip."))
+      }
+      this.replace({
+        ...this.snapshot,
+        status: "playing",
+        chunkIndex: index,
+        error: null,
+      })
+      await audio.play()
+      if (my !== this.generation) return
+      this.prefetch(index + 1)
+    } catch (error) {
+      if (my !== this.generation) return
+      this.fail(error)
+    }
   }
 
-  private stopKeepAlive() {
-    if (this.keepAlive) {
-      clearInterval(this.keepAlive)
-      this.keepAlive = null
+  private async getUrl(text: string) {
+    const key = `${this.voiceURI}::${text}`
+    const cached = this.cache.get(key)
+    if (cached) return cached
+
+    const response = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, voice: this.voiceURI }),
+    })
+    if (!response.ok) {
+      let detail = "Could not synthesize audio."
+      try {
+        const payload = (await response.json()) as { error?: string }
+        if (payload.error) detail = payload.error
+      } catch {
+        detail = `Speech request failed (${response.status}).`
+      }
+      throw new Error(detail)
     }
+    const blob = await response.blob()
+    if (blob.size < 64) throw new Error("The speech service returned empty audio.")
+    const url = URL.createObjectURL(blob)
+    if (this.cache.size > 40) {
+      const first = this.cache.keys().next().value
+      if (first) {
+        const stale = this.cache.get(first)
+        if (stale) URL.revokeObjectURL(stale)
+        this.cache.delete(first)
+      }
+    }
+    this.cache.set(key, url)
+    return url
+  }
+
+  private prefetch(index: number) {
+    const text = this.chunks[index]
+    if (!text) return
+    const key = `${this.voiceURI}::${text}`
+    if (this.cache.has(key)) return
+    void this.getUrl(text).catch(() => undefined)
+  }
+
+  private fail(error: unknown) {
+    const message =
+      error instanceof DOMException && error.name === "NotAllowedError"
+        ? "The browser blocked audio. Click play again."
+        : error instanceof Error
+          ? error.message
+          : "Playback failed."
+    this.generation += 1
+    this.audio?.pause()
+    this.replace({
+      ...idleSnapshot,
+      error: message,
+    })
+  }
+
+  private clearCache() {
+    for (const url of this.cache.values()) URL.revokeObjectURL(url)
+    this.cache.clear()
   }
 
   private replace(next: TtsSnapshot) {
     this.snapshot = next
     this.listeners.forEach((listener) => listener())
   }
-}
-
-function waitForVoices(timeoutMs: number): Promise<SpeechSynthesisVoice[]> {
-  const synth = getSynth()
-  if (!synth) return Promise.resolve([])
-  const existing = synth.getVoices()
-  if (existing.length > 0) return Promise.resolve(existing)
-
-  return new Promise((resolve) => {
-    let settled = false
-    const finish = () => {
-      if (settled) return
-      settled = true
-      synth.removeEventListener("voiceschanged", finish)
-      resolve(synth.getVoices())
-    }
-    synth.addEventListener("voiceschanged", finish)
-    window.setTimeout(finish, timeoutMs)
-  })
-}
-
-function humanizeSpeechError(error: string) {
-  if (getSynth()?.getVoices().length === 0) {
-    return NO_VOICES_MESSAGE
-  }
-  if (error === "not-allowed") {
-    return "The browser blocked speech. Click play again after interacting with the page."
-  }
-  if (error === "synthesis-failed" || error === "synthesis-unavailable") {
-    return "The speech engine failed. Try another voice, or reload the page."
-  }
-  if (error === "network") {
-    return "A cloud voice needed the network and failed. Pick a local voice."
-  }
-  return `Speech stopped (${error}).`
 }
 
 export const tts = new TtsEngine()

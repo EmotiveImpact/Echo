@@ -35,7 +35,7 @@ export function ReplyCard({
   onDelete,
   onPlayFrom,
 }: ReplyCardProps) {
-  const playing = isActive && status === "playing"
+  const playing = isActive && (status === "playing" || status === "loading")
   const paused = isActive && status === "paused"
   const time = new Date(createdAt).toLocaleTimeString([], {
     hour: "numeric",
@@ -51,7 +51,9 @@ export function ReplyCard({
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">Cursor reply · {time}</p>
-        {playing ? (
+        {status === "loading" && isActive ? (
+          <Badge variant="secondary">Loading audio</Badge>
+        ) : playing ? (
           <Badge className="bg-amber-400/15 text-amber-100">Speaking</Badge>
         ) : paused ? (
           <Badge variant="secondary">Paused</Badge>
@@ -71,7 +73,15 @@ export function ReplyCard({
           type="button"
           variant={playing ? "default" : "outline"}
           size="sm"
-          aria-label={playing ? "Pause" : paused ? "Resume" : "Play reply"}
+          aria-label={
+            status === "loading" && isActive
+              ? "Cancel"
+              : playing
+                ? "Pause"
+                : paused
+                  ? "Resume"
+                  : "Play reply"
+          }
           disabled={!supported}
           onClick={() => {
             if (playing) onPause()

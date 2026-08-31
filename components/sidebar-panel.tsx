@@ -17,7 +17,8 @@ export function SidebarPanel() {
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
           ChatGPT and Claude Code can speak a reply because they own the
           transcript UI. Cursor does not let third-party code inject controls
-          into Agent bubbles. That is the actual blocker — not text-to-speech.
+          into Agent bubbles. Hearback sits beside Cursor and plays real audio
+          through the page — the browser speech API is too unreliable for this.
         </p>
       </div>
 
@@ -37,7 +38,7 @@ export function SidebarPanel() {
         <DifficultyRow
           icon={KeyboardIcon}
           title="This companion"
-          detail="Paste any reply, click play, hear it back. Same interaction as ChatGPT, sitting next to Cursor."
+          detail="Paste any reply, click play, hear it. Audio is synthesized and played in the page, like ChatGPT's play button."
           cost="Shipped"
         />
       </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  Loader2Icon,
   PauseIcon,
   PlayIcon,
   SkipBackIcon,
@@ -26,13 +27,12 @@ import { cn } from "@/lib/utils"
 const RATES = [0.8, 1, 1.25, 1.5, 1.75, 2]
 
 type PlayerDockProps = {
-  status: "idle" | "playing" | "paused"
+  status: "idle" | "loading" | "playing" | "paused"
   chunkIndex: number
   chunkCount: number
   rate: number
   voiceURI: string | null
   voices: VoiceOption[]
-  voicesReady: boolean
   skipCode: boolean
   skipUrls: boolean
   supported: boolean
@@ -53,7 +53,6 @@ export function PlayerDock({
   rate,
   voiceURI,
   voices,
-  voicesReady,
   skipCode,
   skipUrls,
   supported,
@@ -101,7 +100,13 @@ export function PlayerDock({
               onClick={onPlayPause}
               className={cn(status === "playing" && "bg-amber-400 text-black hover:bg-amber-300")}
             >
-              {status === "playing" ? <PauseIcon /> : <PlayIcon />}
+              {status === "loading" ? (
+                <Loader2Icon className="animate-spin" />
+              ) : status === "playing" ? (
+                <PauseIcon />
+              ) : (
+                <PlayIcon />
+              )}
             </Button>
             <Button
               type="button"
@@ -126,7 +131,9 @@ export function PlayerDock({
             <p className="ml-2 text-sm text-muted-foreground" aria-live="polite">
               {chunkCount === 0
                 ? "Paste a reply to listen"
-                : `Sentence ${Math.min(chunkIndex + 1, chunkCount)} of ${chunkCount}`}
+                : status === "loading"
+                  ? `Loading sentence ${Math.min(chunkIndex + 1, chunkCount)} of ${chunkCount}`
+                  : `Sentence ${Math.min(chunkIndex + 1, chunkCount)} of ${chunkCount}`}
             </p>
           </div>
 
@@ -166,13 +173,11 @@ export function PlayerDock({
               onValueChange={(value) => {
                 if (typeof value === "string") onVoice(value)
               }}
-              disabled={!voicesReady || voices.length === 0}
-              items={Object.fromEntries(
-                voices.map((voice) => [voice.uri, `${voice.name}${voice.local ? "" : " · cloud"}`])
-              )}
+              disabled={voices.length === 0}
+              items={Object.fromEntries(voices.map((voice) => [voice.uri, voice.name]))}
             >
               <SelectTrigger size="sm" className="w-full sm:w-56">
-                <SelectValue placeholder={voicesReady ? "Choose a voice" : "Loading voices…"} />
+                <SelectValue placeholder="Choose a voice" />
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false} align="end" className="max-h-72">
                 {english.length > 0 ? (
@@ -181,7 +186,6 @@ export function PlayerDock({
                     {english.map((voice) => (
                       <SelectItem key={voice.uri} value={voice.uri}>
                         {voice.name}
-                        {voice.local ? "" : " · cloud"}
                       </SelectItem>
                     ))}
                   </SelectGroup>
