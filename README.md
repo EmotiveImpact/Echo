@@ -22,30 +22,26 @@ Manual paste remains available as a fallback. Code fences are skipped by default
 | MCP `speak` tools | The model must call a tool and duplicate the final response. |
 | Hearback | A supported response hook captures the message; the adjacent Browser panel supplies Play. |
 
-This works with Cursor Agent Chat and Cmd+K. Project hooks are also supported by writable Cloud Agents. The packaged extension registers its bundled hook, starts the local service on port 3000, and opens the player automatically.
+This works with Cursor Agent Chat and Cmd+K. Project hooks are supported by writable Cloud Agents.
 
-## Install the Cursor extension
+## Use in Cursor's Agent Window
 
-Build the installable VSIX:
+No VSIX is needed. Start a fresh Cloud Agent from the latest repository revision. The repository-managed environment automatically:
+
+- runs `npm ci`;
+- starts `npm run dev` on port 3000;
+- exposes the Hearback Browser preview; and
+- loads `.cursor/hooks.json`.
+
+Open `http://localhost:3000` in the Agent Window's Browser tab. The response that completes the current turn appears in Hearback.
+
+## Optional classic IDE extension
+
+The VSIX is only for Cursor's classic VS Code-style IDE, not the Agent Window. Build it with:
 
 ```bash
-npm install
 npm run package:vsix
 ```
-
-Then open Cursor's Extensions view, choose **Install from VSIX…**, and select:
-
-```text
-artifacts/hearback-0.1.0.vsix
-```
-
-After Cursor reloads:
-
-- Hearback starts on `http://localhost:3000`.
-- The extension registers its response hook through Cursor's plugin API.
-- **Hearback: Open Player** opens the adjacent Browser view.
-- <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>H</kbd> on macOS or
-  <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>H</kbd> on Windows/Linux reopens it.
 
 ## Run locally
 

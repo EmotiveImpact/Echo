@@ -1,0 +1,17 @@
+{
+  "name": "Hearback Agent Mode",
+  "install": "npm ci",
+  "terminals": [
+    {
+      "name": "Hearback",
+      "command": "npm run dev",
+      "description": "Hearback player and TTS API on http://localhost:3000"
+    }
+  ],
+  "ports": [
+    {
+      "name": "Hearback",
+      "port": 3000
+    }
+  ]
+}
