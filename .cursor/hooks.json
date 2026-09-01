@@ -1,21 +1,9 @@
 {
   "version": 1,
   "hooks": {
-    "beforeShellExecution": [
-      {
-        "command": "node .cursor/hooks/audit-lifecycle.mjs",
-        "timeout": 5
-      }
-    ],
     "afterAgentResponse": [
       {
         "command": "node .cursor/hooks/capture-response.mjs",
-        "timeout": 5
-      }
-    ],
-    "stop": [
-      {
-        "command": "node .cursor/hooks/audit-lifecycle.mjs",
         "timeout": 5
       }
     ]
