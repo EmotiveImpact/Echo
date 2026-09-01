@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import type { ReactNode } from "react"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -22,7 +23,7 @@ export const metadata: Metadata = {
     "Click play on a Cursor agent reply and hear it back, the way ChatGPT and Claude read answers aloud.",
 }
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
