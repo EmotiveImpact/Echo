@@ -25,6 +25,7 @@ await Promise.all([
 
 await cp(path.join(root, ".next", "standalone"), companion, {
   recursive: true,
+  dereference: true,
 })
 await cp(
   path.join(root, ".next", "static"),
