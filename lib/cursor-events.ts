@@ -10,7 +10,7 @@ const EVENT_FILE =
 export async function readCursorResponses(): Promise<SavedReply[]> {
   let contents: string
   try {
-    contents = await readFile(EVENT_FILE, "utf8")
+    contents = await readFile(/* turbopackIgnore: true */ EVENT_FILE, "utf8")
   } catch (error) {
     if (isMissingFile(error)) return []
     throw error
