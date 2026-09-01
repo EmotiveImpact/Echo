@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterAgentResponse": [
+      {
+        "command": "node .cursor/hooks/capture-response.mjs",
+        "timeout": 5
+      }
+    ]
+  }
+}

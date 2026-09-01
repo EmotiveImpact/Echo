@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { ClipboardPasteIcon, PlayIcon } from "lucide-react"
 import { toast } from "sonner"
 
@@ -15,10 +15,6 @@ type PasteComposerProps = {
 export function PasteComposer({ onListen, disabled }: PasteComposerProps) {
   const [value, setValue] = useState("")
   const areaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    areaRef.current?.focus()
-  }, [])
 
   function submit() {
     const text = value.trim()
@@ -46,7 +42,7 @@ export function PasteComposer({ onListen, disabled }: PasteComposerProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-border/80 bg-card/80 p-3 shadow-sm backdrop-blur-sm">
+    <div className="rounded-xl bg-card/80 p-2">
       <label htmlFor="reply" className="sr-only">
         Cursor reply to read aloud
       </label>
@@ -63,11 +59,11 @@ export function PasteComposer({ onListen, disabled }: PasteComposerProps) {
           }
         }}
         placeholder="Paste the Cursor reply you do not want to read…"
-        className="min-h-28 resize-none border-0 bg-transparent px-2 py-2 shadow-none focus-visible:ring-0 dark:bg-transparent"
+        className="min-h-24 resize-none border-0 bg-transparent px-2 py-2 shadow-none focus-visible:ring-0 dark:bg-transparent"
       />
       <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="px-2 text-xs text-muted-foreground">
-          Copy in Cursor, paste here, hit play. Code fences are skipped while speaking.
+          Manual fallback. Code fences are skipped while speaking.
         </p>
         <div className="flex items-center justify-end gap-2">
           <Button

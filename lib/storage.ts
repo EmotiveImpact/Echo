@@ -4,6 +4,7 @@ export type SavedReply = {
   id: string
   createdAt: number
   text: string
+  source?: "cursor" | "manual"
 }
 
 export type HearbackSettings = {
@@ -18,7 +19,7 @@ export type HearbackStore = {
   settings: HearbackSettings
 }
 
-const KEY = "hearback:v2"
+const KEY = "hearback:v3"
 const MAX_REPLIES = 40
 
 export const defaultSettings: HearbackSettings = {

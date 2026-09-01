@@ -41,7 +41,10 @@ export function getHearbackServerSnapshot(): HearbackStore {
 
 export function addReply(reply: SavedReply) {
   const current = getHearbackSnapshot()
-  emit({ ...current, replies: [reply, ...current.replies] })
+  emit({
+    ...current,
+    replies: [{ ...reply, source: reply.source ?? "manual" }, ...current.replies],
+  })
 }
 
 export function removeReply(id: string) {

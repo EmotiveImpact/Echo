@@ -10,6 +10,7 @@ import type { TtsStatus } from "@/lib/tts-engine"
 
 type ReplyCardProps = {
   createdAt: number
+  source?: "cursor" | "manual"
   blocks: Block[]
   isActive: boolean
   status: TtsStatus
@@ -18,12 +19,13 @@ type ReplyCardProps = {
   onPlay: () => void
   onPause: () => void
   onResume: () => void
-  onDelete: () => void
+  onDelete?: () => void
   onPlayFrom: (index: number) => void
 }
 
 export function ReplyCard({
   createdAt,
+  source = "manual",
   blocks,
   isActive,
   status,
@@ -50,7 +52,9 @@ export function ReplyCard({
       )}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">Cursor reply · {time}</p>
+        <p className="text-xs text-muted-foreground">
+          {source === "cursor" ? "Captured from Cursor" : "Manual paste"} · {time}
+        </p>
         {status === "loading" && isActive ? (
           <Badge variant="secondary">Loading audio</Badge>
         ) : playing ? (
@@ -96,15 +100,17 @@ export function ReplyCard({
           )}
           {playing ? "Pause" : paused ? "Resume" : "Play"}
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Remove reply"
-          onClick={onDelete}
-        >
-          <Trash2Icon />
-        </Button>
+        {onDelete ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Remove reply"
+            onClick={onDelete}
+          >
+            <Trash2Icon />
+          </Button>
+        ) : null}
       </div>
     </article>
   )
