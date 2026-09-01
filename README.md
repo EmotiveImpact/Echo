@@ -22,7 +22,30 @@ Manual paste remains available as a fallback. Code fences are skipped by default
 | MCP `speak` tools | The model must call a tool and duplicate the final response. |
 | Hearback | A supported response hook captures the message; the adjacent Browser panel supplies Play. |
 
-This works with Cursor Agent Chat and Cmd+K. Project hooks are also supported by writable Cloud Agents. A future packaged extension will register the hook and start the local service automatically.
+This works with Cursor Agent Chat and Cmd+K. Project hooks are also supported by writable Cloud Agents. The packaged extension registers its bundled hook, starts the local service on port 3000, and opens the player automatically.
+
+## Install the Cursor extension
+
+Build the installable VSIX:
+
+```bash
+npm install
+npm run package:vsix
+```
+
+Then open Cursor's Extensions view, choose **Install from VSIX…**, and select:
+
+```text
+artifacts/hearback-0.1.0.vsix
+```
+
+After Cursor reloads:
+
+- Hearback starts on `http://localhost:3000`.
+- The extension registers its response hook through Cursor's plugin API.
+- **Hearback: Open Player** opens the adjacent Browser view.
+- <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>H</kbd> on macOS or
+  <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>H</kbd> on Windows/Linux reopens it.
 
 ## Run locally
 
@@ -37,6 +60,7 @@ Open [http://localhost:3000](http://localhost:3000). Playback currently uses neu
 npm test
 npm run lint
 npm run build
+npm run package:vsix
 ```
 
 ## Keyboard

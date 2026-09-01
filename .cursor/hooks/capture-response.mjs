@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
 import { appendFile, mkdir } from "node:fs/promises"
+import { homedir } from "node:os"
 import { dirname } from "node:path"
 
 const EVENT_FILE =
-  process.env.HEARBACK_RESPONSE_FILE ?? "/tmp/hearback-responses.jsonl"
+  process.env.HEARBACK_RESPONSE_FILE ??
+  `${homedir()}/.hearback/responses.jsonl`
 
 async function readStdin() {
   let input = ""

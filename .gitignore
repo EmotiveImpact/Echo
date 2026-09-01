@@ -16,6 +16,10 @@
 # next.js
 /.next/
 /out/
+/extension/assets/
+/extension/companion/
+/extension/dist/
+/artifacts/*.vsix
 
 # production
 /build

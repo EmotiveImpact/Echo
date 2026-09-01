@@ -1,0 +1,5 @@
+src/**
+companion/**/*.map
+**/*.ts
+**/tsconfig.json
+*.vsix

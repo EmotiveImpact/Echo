@@ -1,9 +1,11 @@
 import { readFile } from "node:fs/promises"
+import { homedir } from "node:os"
 
 import type { SavedReply } from "@/lib/storage"
 
 const EVENT_FILE =
-  process.env.HEARBACK_RESPONSE_FILE ?? "/tmp/hearback-responses.jsonl"
+  process.env.HEARBACK_RESPONSE_FILE ??
+  `${homedir()}/.hearback/responses.jsonl`
 
 export async function readCursorResponses(): Promise<SavedReply[]> {
   let contents: string
