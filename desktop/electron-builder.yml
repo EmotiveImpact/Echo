@@ -1,5 +1,6 @@
 appId: com.hearback.desktop
 productName: Hearback
+electronVersion: 44.1.1
 asar: true
 npmRebuild: false
 directories:
