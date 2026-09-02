@@ -7,6 +7,14 @@ type ResponsePayload = {
   source: "cursor" | "manual"
 }
 
+type ShortcutStatus = {
+  captureAccelerator: string | null
+  openAccelerator: string | null
+  captureRegistered: boolean
+  openRegistered: boolean
+  clipboardWatch: boolean
+}
+
 contextBridge.exposeInMainWorld("hearbackDesktop", {
   isDesktop: true,
   cursorStatus: () => ipcRenderer.invoke("hearback:cursor-status"),
@@ -19,6 +27,9 @@ contextBridge.exposeInMainWorld("hearbackDesktop", {
   clearAzure: () => ipcRenderer.invoke("hearback:azure-clear"),
   synthesize: (text: string, voice: string) =>
     ipcRenderer.invoke("hearback:tts-synthesize", text, voice),
+  shortcutStatus: () => ipcRenderer.invoke("hearback:shortcut-status"),
+  setClipboardWatch: (enabled: boolean) =>
+    ipcRenderer.invoke("hearback:set-clipboard-watch", enabled),
   onResponse: (callback: (response: ResponsePayload) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, response: ResponsePayload) =>
       callback(response)
@@ -30,5 +41,11 @@ contextBridge.exposeInMainWorld("hearbackDesktop", {
       callback(message)
     ipcRenderer.on("hearback:cursor-error", listener)
     return () => ipcRenderer.removeListener("hearback:cursor-error", listener)
+  },
+  onShortcutStatus: (callback: (status: ShortcutStatus) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: ShortcutStatus) =>
+      callback(status)
+    ipcRenderer.on("hearback:shortcut-status", listener)
+    return () => ipcRenderer.removeListener("hearback:shortcut-status", listener)
   },
 })

@@ -12,12 +12,18 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  powerMonitor,
   safeStorage,
   shell,
+  systemPreferences,
   Tray,
 } from "electron"
 
-const APP_URL = "http://localhost:3000"
+import { shouldAutoCaptureClipboard } from "../../lib/clipboard-capture"
+
+const APP_HOST = "127.0.0.1"
+const APP_PORT = "3000"
+const APP_URL = `http://${APP_HOST}:${APP_PORT}`
 const TERMINAL_STATUSES = new Set([
   "FINISHED",
   "ERROR",
@@ -27,6 +33,16 @@ const TERMINAL_STATUSES = new Set([
   "error",
   "cancelled",
 ])
+const CAPTURE_ACCELERATORS = [
+  "CommandOrControl+Shift+H",
+  "CommandOrControl+Alt+H",
+  "CommandOrControl+Shift+.",
+]
+const OPEN_ACCELERATORS = [
+  "CommandOrControl+Shift+Space",
+  "CommandOrControl+Alt+Space",
+  "CommandOrControl+Shift+O",
+]
 
 type CursorAgent = {
   id: string
@@ -53,6 +69,14 @@ type AzureCredentials = {
   region: string
 }
 
+type ShortcutStatus = {
+  captureAccelerator: string | null
+  openAccelerator: string | null
+  captureRegistered: boolean
+  openRegistered: boolean
+  clipboardWatch: boolean
+}
+
 const ALLOWED_VOICES = new Set([
   "en-US-AriaNeural",
   "en-US-JennyNeural",
@@ -68,9 +92,16 @@ let tray: Tray | null = null
 let server: ChildProcess | null = null
 let monitor: ReturnType<typeof setInterval> | null = null
 let hookMonitor: ReturnType<typeof setInterval> | null = null
+let clipboardMonitor: ReturnType<typeof setInterval> | null = null
 let monitoring = false
 let delivered = new Set<string>()
 let quitting = false
+let askedAccessibility = false
+let clipboardWatchEnabled = true
+let lastSeenClipboard = ""
+let captureAccelerator: string | null = null
+let openAccelerator: string | null = null
+let restartingServer = false
 
 const singleInstance = app.requestSingleInstanceLock()
 if (!singleInstance) {
@@ -81,12 +112,14 @@ if (!singleInstance) {
 
 app.whenReady().then(async () => {
   await loadDelivered()
+  createAppMenu()
   registerIpc()
   await ensureServer()
   createWindow()
   createTray()
   registerShortcuts()
   startHookWatch()
+  startClipboardWatch()
   await startMonitoring()
 })
 
@@ -96,13 +129,27 @@ app.on("window-all-closed", () => {
   }
 })
 
-app.on("activate", () => showWindow())
+app.on("activate", () => {
+  showWindow()
+  registerShortcuts()
+})
+
+powerMonitor.on("resume", () => {
+  registerShortcuts()
+  void ensureServer()
+})
 
 app.on("before-quit", () => {
+  quitting = true
   if (monitor) clearInterval(monitor)
   if (hookMonitor) clearInterval(hookMonitor)
+  if (clipboardMonitor) clearInterval(clipboardMonitor)
   globalShortcut.unregisterAll()
   server?.kill()
+})
+
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll()
 })
 
 function createWindow() {
@@ -121,7 +168,7 @@ function createWindow() {
     },
   })
 
-  mainWindow.removeMenu()
+  mainWindow.webContents.session.clearCache().catch(() => undefined)
   mainWindow.on("close", (event) => {
     if (!quitting) {
       event.preventDefault()
@@ -129,6 +176,31 @@ function createWindow() {
     }
   })
   mainWindow.on("ready-to-show", () => mainWindow?.show())
+  mainWindow.webContents.on("did-fail-load", () => {
+    setTimeout(() => {
+      if (!quitting) void mainWindow?.loadURL(APP_URL)
+    }, 800)
+  })
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.type !== "keyDown") return
+    const command = input.meta || input.control
+    if (!command) return
+    const key = input.key.toLowerCase()
+    if (input.shift && key === "h") {
+      event.preventDefault()
+      void captureClipboard({ show: true })
+      return
+    }
+    if (input.alt && key === "h") {
+      event.preventDefault()
+      void captureClipboard({ show: true })
+      return
+    }
+    if (input.shift && (input.code === "Space" || key === "o")) {
+      event.preventDefault()
+      showWindow()
+    }
+  })
   void mainWindow.loadURL(APP_URL)
 }
 
@@ -140,23 +212,136 @@ function createTray() {
   )
   tray = new Tray(icon)
   tray.setToolTip("Hearback")
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: "Open Hearback", click: () => showWindow() },
-      {
-        label: "Read Clipboard",
-        click: () => captureClipboard(),
-      },
-      { type: "separator" },
-      { label: "Quit", click: () => quitApp() },
-    ])
-  )
+  tray.setContextMenu(buildTrayMenu())
   tray.on("click", () => showWindow())
 }
 
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    { label: "Open Hearback", click: () => showWindow() },
+    {
+      label: "Read Clipboard",
+      click: () => void captureClipboard({ show: true }),
+    },
+    {
+      label: clipboardWatchEnabled
+        ? "Clipboard Watch: On"
+        : "Clipboard Watch: Off",
+      click: () => {
+        clipboardWatchEnabled = !clipboardWatchEnabled
+        tray?.setContextMenu(buildTrayMenu())
+        createAppMenu()
+        publishShortcutStatus()
+      },
+    },
+    { type: "separator" },
+    { label: "Quit", click: () => quitApp() },
+  ])
+}
+
+function createAppMenu() {
+  const isMac = process.platform === "darwin"
+  const template: Electron.MenuItemConstructorOptions[] = [
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: "about" as const },
+              { type: "separator" as const },
+              { role: "hide" as const },
+              { role: "hideOthers" as const },
+              { role: "unhide" as const },
+              { type: "separator" as const },
+              { role: "quit" as const },
+            ],
+          },
+        ]
+      : []),
+    {
+      label: "Capture",
+      submenu: [
+        {
+          label: "Read Clipboard",
+          accelerator: captureAccelerator ?? "CommandOrControl+Shift+H",
+          click: () => void captureClipboard({ show: true }),
+        },
+        {
+          label: "Show Hearback",
+          accelerator: openAccelerator ?? "CommandOrControl+Shift+Space",
+          click: () => showWindow(),
+        },
+        { type: "separator" },
+        {
+          label: "Watch Clipboard",
+          type: "checkbox",
+          checked: clipboardWatchEnabled,
+          click: (item) => {
+            clipboardWatchEnabled = item.checked
+            tray?.setContextMenu(buildTrayMenu())
+            publishShortcutStatus()
+          },
+        },
+      ],
+    },
+    { role: "editMenu" },
+    { role: "windowMenu" },
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
 function registerShortcuts() {
-  globalShortcut.register("CommandOrControl+Shift+Space", () => showWindow())
-  globalShortcut.register("CommandOrControl+Shift+H", () => captureClipboard())
+  globalShortcut.unregisterAll()
+  captureAccelerator = registerFirst(CAPTURE_ACCELERATORS, () => {
+    void captureClipboard({ show: true })
+  })
+  openAccelerator = registerFirst(OPEN_ACCELERATORS, () => showWindow())
+
+  if (!captureAccelerator || !openAccelerator) {
+    maybeAskAccessibility()
+  }
+
+  createAppMenu()
+  tray?.setContextMenu(buildTrayMenu())
+  publishShortcutStatus()
+}
+
+function registerFirst(accelerators: string[], callback: () => void) {
+  for (const accelerator of accelerators) {
+    try {
+      if (globalShortcut.isRegistered(accelerator)) continue
+      if (globalShortcut.register(accelerator, callback)) {
+        return accelerator
+      }
+    } catch {
+      // Try the next combo when the OS rejects this one.
+    }
+  }
+  return null
+}
+
+function maybeAskAccessibility() {
+  if (askedAccessibility || process.platform !== "darwin") return
+  askedAccessibility = true
+  try {
+    systemPreferences.isTrustedAccessibilityClient(true)
+  } catch {
+    // Electron builds without this API can still run the rest of the app.
+  }
+}
+
+function shortcutStatus(): ShortcutStatus {
+  return {
+    captureAccelerator,
+    openAccelerator,
+    captureRegistered: Boolean(captureAccelerator),
+    openRegistered: Boolean(openAccelerator),
+    clipboardWatch: clipboardWatchEnabled,
+  }
+}
+
+function publishShortcutStatus() {
+  mainWindow?.webContents.send("hearback:shortcut-status", shortcutStatus())
 }
 
 function registerIpc() {
@@ -183,7 +368,20 @@ function registerIpc() {
     await rm(credentialsPath(), { force: true })
     return { status: "disconnected" }
   })
-  ipcMain.handle("hearback:read-clipboard", () => captureClipboard())
+  ipcMain.handle("hearback:read-clipboard", () =>
+    captureClipboard({ show: true })
+  )
+  ipcMain.handle("hearback:shortcut-status", () => shortcutStatus())
+  ipcMain.handle(
+    "hearback:set-clipboard-watch",
+    (_event, enabled: boolean) => {
+      clipboardWatchEnabled = Boolean(enabled)
+      tray?.setContextMenu(buildTrayMenu())
+      createAppMenu()
+      publishShortcutStatus()
+      return { enabled: clipboardWatchEnabled }
+    }
+  )
   ipcMain.handle("hearback:azure-status", async () => ({
     configured: Boolean(await readAzureCredentials()),
   }))
@@ -367,6 +565,32 @@ function startHookWatch() {
   hookMonitor = setInterval(() => void pollHookFile(), 2000)
 }
 
+function startClipboardWatch() {
+  lastSeenClipboard = clipboard.readText()
+  if (clipboardMonitor) clearInterval(clipboardMonitor)
+  clipboardMonitor = setInterval(() => {
+    const text = clipboard.readText()
+    if (!clipboardWatchEnabled) {
+      lastSeenClipboard = text
+      return
+    }
+    if (!shouldAutoCaptureClipboard(text, lastSeenClipboard)) {
+      lastSeenClipboard = text
+      return
+    }
+    lastSeenClipboard = text
+    emitResponse({
+      id: `clipboard:${Date.now()}`,
+      text: text.trim(),
+      createdAt: Date.now(),
+      source: "manual",
+    })
+    if (process.platform === "darwin") {
+      app.dock?.bounce("informational")
+    }
+  }, 900)
+}
+
 async function pollHookFile() {
   const file =
     process.env.HEARBACK_RESPONSE_FILE ??
@@ -406,8 +630,9 @@ async function pollHookFile() {
   await saveDelivered()
 }
 
-async function captureClipboard() {
-  const text = (await clipboard.readText()).trim()
+async function captureClipboard(options?: { show?: boolean }) {
+  const text = clipboard.readText().trim()
+  lastSeenClipboard = text
   if (!text) return { captured: false }
   emitResponse({
     id: `clipboard:${Date.now()}`,
@@ -415,7 +640,7 @@ async function captureClipboard() {
     createdAt: Date.now(),
     source: "manual",
   })
-  showWindow()
+  if (options?.show !== false) showWindow()
   return { captured: true }
 }
 
@@ -425,31 +650,50 @@ function emitResponse(response: CapturedResponse) {
 
 async function ensureServer() {
   if (await isHealthy()) return
+  if (restartingServer) return
+  restartingServer = true
 
-  const companion = app.isPackaged
-    ? path.join(process.resourcesPath, "companion")
-    : path.join(__dirname, "..", "companion")
-  const entry = path.join(companion, "server.js")
-  server = spawn(process.execPath, [entry], {
-    cwd: companion,
-    env: {
-      ...process.env,
-      ELECTRON_RUN_AS_NODE: "1",
-      HOSTNAME: "127.0.0.1",
-      PORT: "3000",
-      NODE_ENV: "production",
-    },
-    stdio: "ignore",
-    windowsHide: true,
-  })
+  try {
+    const companion = app.isPackaged
+      ? path.join(process.resourcesPath, "companion")
+      : path.join(__dirname, "..", "companion")
+    const entry = path.join(companion, "server.js")
+    server = spawn(process.execPath, [entry], {
+      cwd: companion,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        HOSTNAME: APP_HOST,
+        PORT: APP_PORT,
+        NODE_ENV: "production",
+      },
+      stdio: "ignore",
+      windowsHide: true,
+    })
+    server.on("exit", () => {
+      server = null
+      if (quitting) return
+      setTimeout(() => {
+        void ensureServer()
+          .then(() => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              void mainWindow.loadURL(APP_URL)
+            }
+          })
+          .catch(() => undefined)
+      }, 800)
+    })
 
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    await delay(200)
-    if (await isHealthy()) return
-    if (server.exitCode !== null) break
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      await delay(200)
+      if (await isHealthy()) return
+      if (server.exitCode !== null) break
+    }
+
+    throw new Error("Hearback could not start its local player on port 3000.")
+  } finally {
+    restartingServer = false
   }
-
-  throw new Error("Hearback could not start its local player on port 3000.")
 }
 
 async function isHealthy() {
@@ -603,4 +847,3 @@ function errorMessage(error: unknown) {
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
-

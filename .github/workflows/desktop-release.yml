@@ -122,5 +122,5 @@ jobs:
             open /path/to/Hearback.app
             ```
 
-            - **Apple Silicon Mac:** `Hearback-0.1.6-arm64-mac.zip`
-            - **Intel Mac:** `Hearback-0.1.6-x64-mac.zip`
+            - **Apple Silicon Mac:** `Hearback-0.1.7-arm64-mac.zip`
+            - **Intel Mac:** `Hearback-0.1.7-x64-mac.zip`

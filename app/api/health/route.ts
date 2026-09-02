@@ -4,7 +4,7 @@ export function GET() {
   return Response.json(
     {
       app: "hearback",
-      version: "0.1.0",
+      version: "0.1.7",
     },
     {
       headers: {

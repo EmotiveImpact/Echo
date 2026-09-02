@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "r
 import {
   AudioLinesIcon,
   CircleCheckIcon,
+  ClipboardPasteIcon,
   CloudIcon,
   Link2Icon,
   Loader2Icon,
@@ -18,16 +19,20 @@ import { ReplyCard } from "@/components/reply-card"
 import { DesktopVoiceSettings } from "@/components/desktop-settings"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
+import { prettyAccelerator } from "@/lib/clipboard-capture"
 import {
   getCursorResponseServerSnapshot,
   getCursorResponseSnapshot,
   subscribeCursorResponses,
 } from "@/lib/cursor-response-store"
 import {
+  captureDesktopClipboard,
   connectCursor,
   disconnectCursor,
   getDesktopServerSnapshot,
   getDesktopSnapshot,
+  setDesktopClipboardWatch,
   subscribeDesktop,
 } from "@/lib/desktop-store"
 import {
@@ -149,6 +154,13 @@ export function HearbackApp() {
     toast.error("Wait for a Cursor reply, or paste one manually.")
   }, [playReply])
 
+  const readClipboard = useCallback(async () => {
+    const result = await captureDesktopClipboard()
+    if (!result?.captured) {
+      toast.error("Clipboard is empty. Copy a reply in Cursor first.")
+    }
+  }, [])
+
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null
@@ -156,8 +168,20 @@ export function HearbackApp() {
         target?.tagName === "TEXTAREA" ||
         target?.tagName === "INPUT" ||
         target?.isContentEditable
+      const command = event.metaKey || event.ctrlKey
 
-      if (event.code === "Space" && !typing) {
+      if (command && event.shiftKey && event.key.toLowerCase() === "h") {
+        event.preventDefault()
+        void readClipboard()
+        return
+      }
+      if (command && event.altKey && event.key.toLowerCase() === "h") {
+        event.preventDefault()
+        void readClipboard()
+        return
+      }
+
+      if (event.code === "Space" && !typing && !command) {
         event.preventDefault()
         onDockPlayPause()
       }
@@ -173,7 +197,17 @@ export function HearbackApp() {
 
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [onDockPlayPause])
+  }, [onDockPlayPause, readClipboard])
+
+  const isMac =
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad/.test(navigator.platform)
+  const captureShortcut =
+    prettyAccelerator(desktop.shortcuts.captureAccelerator, isMac) ??
+    (isMac ? "⌘⇧H" : "Ctrl+Shift+H")
+  const openShortcut =
+    prettyAccelerator(desktop.shortcuts.openAccelerator, isMac) ??
+    (isMac ? "⌘⇧Space" : "Ctrl+Shift+Space")
 
   useEffect(() => {
     if (snapshot.status !== "playing") return
@@ -267,8 +301,35 @@ export function HearbackApp() {
                 {desktop.error}
               </p>
             ) : null}
-            <p className="mt-3 border-t border-border/70 pt-2 text-xs text-muted-foreground">
-              Global shortcuts: ⌘⇧Space opens Hearback · ⌘⇧H reads the clipboard.
+            <div className="mt-3 flex flex-col gap-2 border-t border-border/70 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void readClipboard()}
+              >
+                <ClipboardPasteIcon data-icon="inline-start" />
+                Read clipboard
+              </Button>
+              <label className="flex items-center justify-between gap-3 text-xs text-muted-foreground sm:justify-end">
+                <span>Watch clipboard</span>
+                <Switch
+                  checked={desktop.clipboardWatch}
+                  onCheckedChange={(checked) => {
+                    void setDesktopClipboardWatch(Boolean(checked))
+                  }}
+                />
+              </label>
+            </div>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+              {desktop.clipboardWatch
+                ? "Copy a reply in Cursor and it appears here. You do not need a shortcut."
+                : "Clipboard watch is off. Use Read clipboard or a shortcut."}{" "}
+              {desktop.shortcuts.captureRegistered
+                ? `${captureShortcut} reads the clipboard.`
+                : "macOS or another app blocked the capture shortcut. Use the button, the menu bar icon, or turn watch on."}{" "}
+              {desktop.shortcuts.openRegistered
+                ? `${openShortcut} brings Hearback forward.`
+                : null}
             </p>
           </section>
         ) : null}
@@ -287,11 +348,11 @@ export function HearbackApp() {
           </div>
         </details>
 
-        {cursor.status === "error" ? (
+        {cursor.status === "error" && !desktop.available ? (
           <div className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm">
             <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
             <div>
-              <p className="font-medium">Response bridge disconnected</p>
+              <p className="font-medium">Local player unreachable</p>
               <p className="mt-1 text-muted-foreground">{cursor.error}</p>
             </div>
           </div>
@@ -309,7 +370,7 @@ export function HearbackApp() {
             </h2>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
               {desktop.available
-                ? "Completed Cloud Agent runs appear here automatically. You can always use the clipboard shortcut as a fallback."
+                ? "Completed Cloud Agent runs appear here automatically. Copy a reply, click Read clipboard, or use the menu bar icon if a shortcut is blocked."
                 : "This project installs a real Cursor response hook. When an Agent message finishes, it appears here automatically—no copy and paste."}
             </p>
             <p className="mt-4 text-xs text-muted-foreground">

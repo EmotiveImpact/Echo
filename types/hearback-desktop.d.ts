@@ -7,6 +7,14 @@ type CursorDesktopStatus = {
   expiresAtMs?: number
 }
 
+export type DesktopShortcutStatus = {
+  captureAccelerator: string | null
+  openAccelerator: string | null
+  captureRegistered: boolean
+  openRegistered: boolean
+  clipboardWatch: boolean
+}
+
 type HearbackDesktopBridge = {
   isDesktop: true
   cursorStatus(): Promise<CursorDesktopStatus>
@@ -20,8 +28,11 @@ type HearbackDesktopBridge = {
   }): Promise<{ configured: boolean }>
   clearAzure(): Promise<{ configured: boolean }>
   synthesize(text: string, voice: string): Promise<Uint8Array | null>
+  shortcutStatus(): Promise<DesktopShortcutStatus>
+  setClipboardWatch(enabled: boolean): Promise<{ enabled: boolean }>
   onResponse(callback: (response: SavedReply) => void): () => void
   onCursorError(callback: (message: string) => void): () => void
+  onShortcutStatus(callback: (status: DesktopShortcutStatus) => void): () => void
 }
 
 declare global {

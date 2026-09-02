@@ -2,8 +2,8 @@
 
 Download the Mac app from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-- Apple Silicon: `Hearback-0.1.6-arm64-mac.zip`
-- Intel Mac: `Hearback-0.1.6-x64-mac.zip`
+- Apple Silicon: `Hearback-0.1.7-arm64-mac.zip`
+- Intel Mac: `Hearback-0.1.7-x64-mac.zip`
 
 macOS will say the unsigned download is **damaged**. That is Gatekeeper, not a broken file. In Terminal:
 
@@ -26,9 +26,13 @@ Hearback Desktop is the scalable application:
   resulting credential with Electron `safeStorage` (Keychain on macOS).
 - It checks the authenticated user's Cloud Agents every 20 seconds and imports
   new completed run results.
-- <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> reads the clipboard as a
-  guaranteed fallback.
-- <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> opens Hearback.
+- Clipboard watch is on by default: copy a reply in Cursor and it appears in
+  Hearback. You can also click **Read clipboard** or use the menu bar icon.
+- <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> reads the clipboard when macOS
+  allows the shortcut. If another app already owns that combo, Hearback falls
+  back to <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>H</kbd>.
+- <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> opens Hearback, with
+  <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd> as a fallback.
 - Official Azure Speech credentials can be added in-app; they are encrypted at
   rest. Without Azure, the alpha uses the unofficial Edge endpoint.
 

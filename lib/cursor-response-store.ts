@@ -23,13 +23,26 @@ const serverSnapshot: CursorResponseSnapshot = {
 let snapshot = serverSnapshot
 let timer: ReturnType<typeof setInterval> | null = null
 let requestInFlight = false
+let consecutiveFailures = 0
 const listeners = new Set<() => void>()
+
+function desktopBridgeAvailable() {
+  return typeof window !== "undefined" && Boolean(window.hearbackDesktop)
+}
 
 export function subscribeCursorResponses(listener: () => void) {
   listeners.add(listener)
   if (listeners.size === 1) {
-    void refresh()
-    timer = setInterval(() => void refresh(), 1200)
+    if (desktopBridgeAvailable()) {
+      replace({
+        responses: snapshot.responses,
+        status: "ready",
+        error: null,
+      })
+    } else {
+      void refresh()
+      timer = setInterval(() => void refresh(), 1200)
+    }
   }
 
   return () => {
@@ -50,6 +63,16 @@ export function getCursorResponseServerSnapshot() {
 }
 
 async function refresh() {
+  if (desktopBridgeAvailable()) {
+    if (snapshot.status === "error" || snapshot.error) {
+      replace({
+        responses: snapshot.responses,
+        status: snapshot.responses.length > 0 ? "connected" : "ready",
+        error: null,
+      })
+    }
+    return
+  }
   if (requestInFlight) return
   requestInFlight = true
 
@@ -63,23 +86,38 @@ async function refresh() {
 
     const payload = (await response.json()) as { responses?: SavedReply[] }
     const responses = Array.isArray(payload.responses) ? payload.responses : []
+    consecutiveFailures = 0
     replace({
       responses,
       status: responses.length > 0 ? "connected" : "ready",
       error: null,
     })
   } catch (error) {
+    consecutiveFailures += 1
+    if (consecutiveFailures < 3 && snapshot.status !== "error") {
+      return
+    }
     replace({
       responses: snapshot.responses,
       status: "error",
-      error:
-        error instanceof Error
-          ? error.message
-          : "Could not connect to the response bridge.",
+      error: bridgeError(error),
     })
   } finally {
     requestInFlight = false
   }
+}
+
+function bridgeError(error: unknown) {
+  const raw = error instanceof Error ? error.message : String(error)
+  if (
+    raw === "Failed to fetch" ||
+    raw === "Load failed" ||
+    raw === "NetworkError when attempting to fetch resource." ||
+    raw.includes("NetworkError")
+  ) {
+    return "Hearback cannot reach its local server. Reopen the Mac app, or run npm run dev if you are in a browser."
+  }
+  return raw
 }
 
 function replace(next: CursorResponseSnapshot) {
