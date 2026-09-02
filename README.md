@@ -2,8 +2,8 @@
 
 Download the Mac app from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-- Apple Silicon: `Hearback-0.1.4-arm64-mac.zip`
-- Intel Mac: `Hearback-0.1.4-x64-mac.zip`
+- Apple Silicon: `Hearback-0.1.5-arm64-mac.zip`
+- Intel Mac: `Hearback-0.1.5-x64-mac.zip`
 
 macOS will say the unsigned download is **damaged**. That is Gatekeeper, not a broken file. In Terminal:
 
