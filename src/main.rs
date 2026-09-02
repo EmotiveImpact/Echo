@@ -1,4 +1,5 @@
 mod app;
+mod auth;
 mod clipboard;
 mod config;
 mod cursor;

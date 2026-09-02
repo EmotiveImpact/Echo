@@ -83,6 +83,7 @@ pub struct CursorView {
     pub email: Option<String>,
     pub error: Option<String>,
     pub checking: bool,
+    pub login_url: Option<String>,
 }
 
 impl Default for CursorView {
@@ -92,6 +93,7 @@ impl Default for CursorView {
             email: None,
             error: None,
             checking: false,
+            login_url: None,
         }
     }
 }
@@ -106,7 +108,8 @@ pub struct Snapshot {
 
 #[derive(Debug, Clone)]
 pub enum Command {
-    Connect(String),
+    ConnectBrowser,
+    ConnectKey(String),
     Disconnect,
     CaptureText { text: String, play: bool },
     SetWatch(bool),

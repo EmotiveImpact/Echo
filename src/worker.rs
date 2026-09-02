@@ -6,6 +6,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use rodio::{Decoder, OutputStream, OutputStreamHandle, Sink};
 use serde::Deserialize;
 
+use crate::auth;
 use crate::config;
 use crate::cursor;
 use crate::model::{
@@ -79,6 +80,7 @@ struct State {
     last_hook: Instant,
     last_cursor: Instant,
     dirty: bool,
+    login_task: Option<tokio::task::JoinHandle<Result<auth::LoginResult, String>>>,
 }
 
 async fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<Event>) {
@@ -109,6 +111,7 @@ async fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<Event>) {
         last_hook: Instant::now() - Duration::from_secs(10),
         last_cursor: Instant::now() - Duration::from_secs(30),
         dirty: true,
+        login_task: None,
     };
 
     if state.api_key.is_some() {
@@ -121,6 +124,7 @@ async fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<Event>) {
         while let Ok(command) = cmd_rx.try_recv() {
             handle_command(&mut state, command, &evt_tx).await;
         }
+        finish_browser_login(&mut state).await;
 
         if state.last_hook.elapsed() >= Duration::from_secs(2) {
             ingest_hooks(&mut state);
@@ -143,46 +147,34 @@ async fn run(cmd_rx: Receiver<Command>, evt_tx: Sender<Event>) {
     }
 }
 
-async fn handle_command(state: &mut State, command: Command, evt_tx: &Sender<Event>) {
+async fn handle_command(state: &mut State, command: Command, _evt_tx: &Sender<Event>) {
     match command {
-        Command::Connect(key) => {
-            state.cursor.checking = true;
-            state.cursor.error = None;
-            state.dirty = true;
-            publish(state, evt_tx);
-            match cursor::whoami(&key).await {
-                Ok(email) => {
-                    if let Err(error) = config::save_api_key(&key) {
-                        state.cursor = CursorView {
-                            connected: false,
-                            checking: false,
-                            email: None,
-                            error: Some(error.to_string()),
-                        };
-                    } else {
-                        state.api_key = Some(key);
-                        state.cursor = CursorView {
-                            connected: true,
-                            checking: false,
-                            email,
-                            error: None,
-                        };
-                        poll_cursor(state).await;
-                        state.last_cursor = Instant::now();
-                    }
+        Command::ConnectBrowser => {
+            if state.login_task.is_some() {
+                return;
+            }
+            match auth::create_session() {
+                Ok(session) => {
+                    let open_error = auth::open_browser(&session.login_url).err();
+                    state.cursor.checking = true;
+                    state.cursor.login_url = Some(session.login_url.clone());
+                    state.cursor.error = open_error;
+                    state.dirty = true;
+                    state.login_task = Some(tokio::spawn(auth::finish_login(session)));
                 }
                 Err(error) => {
-                    state.cursor = CursorView {
-                        connected: false,
-                        checking: false,
-                        email: None,
-                        error: Some(error),
-                    };
+                    state.cursor.error = Some(error);
+                    state.dirty = true;
                 }
             }
-            state.dirty = true;
+        }
+        Command::ConnectKey(key) => {
+            apply_api_key(state, key, None).await;
         }
         Command::Disconnect => {
+            if let Some(handle) = state.login_task.take() {
+                handle.abort();
+            }
             state.api_key = None;
             config::clear_api_key();
             state.cursor = CursorView::default();
@@ -261,6 +253,54 @@ async fn handle_command(state: &mut State, command: Command, evt_tx: &Sender<Eve
             state.dirty = true;
         }
     }
+}
+
+async fn finish_browser_login(state: &mut State) {
+    let Some(handle) = state.login_task.take() else {
+        return;
+    };
+    if !handle.is_finished() {
+        state.login_task = Some(handle);
+        return;
+    }
+    match handle.await {
+        Ok(Ok(login)) => {
+            apply_api_key(state, login.api_key, login.email).await;
+        }
+        Ok(Err(error)) => {
+            state.cursor.checking = false;
+            state.cursor.error = Some(error);
+            state.dirty = true;
+        }
+        Err(error) => {
+            state.cursor.checking = false;
+            state.cursor.error = Some(error.to_string());
+            state.dirty = true;
+        }
+    }
+}
+
+async fn apply_api_key(state: &mut State, key: String, email: Option<String>) {
+    if let Err(error) = config::save_api_key(&key) {
+        state.cursor = CursorView {
+            error: Some(error.to_string()),
+            ..CursorView::default()
+        };
+        state.dirty = true;
+        return;
+    }
+    let who = cursor::whoami(&key).await;
+    state.api_key = Some(key);
+    state.cursor = CursorView {
+        connected: true,
+        checking: false,
+        email: who.as_ref().ok().cloned().flatten().or(email),
+        error: who.err(),
+        login_url: None,
+    };
+    poll_cursor(state).await;
+    state.last_cursor = Instant::now();
+    state.dirty = true;
 }
 
 fn start_play(state: &mut State, id: &str, start: usize) {

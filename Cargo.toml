@@ -1,6 +1,6 @@
 [package]
 name = "echo-desktop"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "Echo plays Cursor Agent replies with neural voices."
 license = "UNLICENSED"
@@ -13,6 +13,8 @@ path = "src/main.rs"
 
 [dependencies]
 arboard = "3"
+base64 = "0.22"
+getrandom = "0.2"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 eframe = { version = "0.31", default-features = false, features = [
     "default_fonts",
@@ -41,6 +43,7 @@ tokio-tungstenite = { version = "0.26", features = [
     "rustls-tls-webpki-roots",
 ] }
 uuid = { version = "1", features = ["v4"] }
+webbrowser = "1"
 
 [profile.release]
 lto = true

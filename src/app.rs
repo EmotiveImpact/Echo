@@ -216,11 +216,11 @@ fn connect_card(ui: &mut egui::Ui, app: &mut EchoApp) {
                 };
                 ui.label(RichText::new(title).strong());
                 let detail = if app.snapshot.cursor.checking {
-                    "Checking your Cursor key…".to_string()
+                    "Sign in with Cursor in the browser that just opened. Echo will pick up the key when you finish.".to_string()
                 } else if let Some(email) = &app.snapshot.cursor.email {
                     format!("{email} · completed runs every 20 seconds")
                 } else {
-                    "Paste a Cursor API key. Echo stores it in ~/.echo and polls finished Agent runs.".to_string()
+                    "Sign in through Cursor, the same way as before. Echo mints an API key and stores it in ~/.echo.".to_string()
                 };
                 ui.label(RichText::new(detail).size(12.0).color(MUTED));
             });
@@ -235,21 +235,39 @@ fn connect_card(ui: &mut egui::Ui, app: &mut EchoApp) {
                 app.send(Command::Disconnect);
             }
         } else {
-            ui.add(
-                egui::TextEdit::singleline(&mut app.api_key)
-                    .password(true)
-                    .hint_text("Cursor API key")
-                    .desired_width(ui.available_width()),
-            );
+            let waiting = app.snapshot.cursor.checking;
+            if ui
+                .add_enabled(!waiting, egui::Button::new("Connect Cursor").fill(AMBER))
+                .clicked()
+            {
+                app.send(Command::ConnectBrowser);
+            }
+            if let Some(url) = &app.snapshot.cursor.login_url {
+                ui.add_space(6.0);
+                ui.hyperlink_to("Open the Cursor sign-in page", url);
+            }
             ui.add_space(8.0);
-            ui.horizontal(|ui| {
-                let ready = !app.api_key.trim().is_empty() && !app.snapshot.cursor.checking;
-                if ui.add_enabled(ready, egui::Button::new("Connect Cursor")).clicked() {
-                    app.send(Command::Connect(app.api_key.trim().to_string()));
-                    app.api_key.clear();
-                }
-                ui.hyperlink_to("Create a key in Cursor", "https://cursor.com/settings");
-            });
+            egui::CollapsingHeader::new("Paste a key instead")
+                .default_open(false)
+                .show(ui, |ui| {
+                    ui.add(
+                        egui::TextEdit::singleline(&mut app.api_key)
+                            .password(true)
+                            .hint_text("Cursor API key")
+                            .desired_width(ui.available_width()),
+                    );
+                    ui.add_space(6.0);
+                    if ui
+                        .add_enabled(
+                            !app.api_key.trim().is_empty() && !waiting,
+                            egui::Button::new("Use this key"),
+                        )
+                        .clicked()
+                    {
+                        app.send(Command::ConnectKey(app.api_key.trim().to_string()));
+                        app.api_key.clear();
+                    }
+                });
         }
     });
 }

@@ -6,8 +6,8 @@ No Electron. No Next.js. No `localhost:3000` bridge. One Rust binary.
 
 Download the latest Mac build from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-- Apple Silicon: `Echo-0.2.1-arm64-mac.zip`
-- Intel Mac: `Echo-0.2.1-x64-mac.zip`
+- Apple Silicon: `Echo-0.2.2-arm64-mac.zip`
+- Intel Mac: `Echo-0.2.2-x64-mac.zip`
 
 Unzip into **Downloads**. macOS will say the unsigned app is **damaged**. That is Gatekeeper. Double-click **Open Echo.command**, or run:
 
@@ -19,7 +19,7 @@ open ~/Downloads/Echo.app
 ## What it does
 
 - Plays Cursor replies with neural voices (Aria and friends) through Edge TTS.
-- Connects with a Cursor API key and imports finished Cloud Agent runs.
+- **Connect Cursor** opens the official browser sign-in and mints an API key.
 - Watches the clipboard, so copying a reply is enough.
 - Registers a real OS hotkey (`⌘⇧H`, or `⌘⌥H` if the first combo is taken).
 - Still reads `~/.echo/responses.jsonl` from the repo hook, and the older `~/.hearback` file if it exists.
@@ -28,7 +28,7 @@ open ~/Downloads/Echo.app
 
 1. Quit Hearback. Drop `Echo.app` in `~/Downloads`.
 2. Run the two commands above.
-3. Paste a Cursor API key from [Cursor Settings](https://cursor.com/settings) and click **Connect Cursor**.
+3. Click **Connect Cursor**. Sign in in the browser. Echo mints the API key, same as before.
 4. Keep chatting. When a run finishes, Echo speaks it if Autoplay is on.
 5. Or copy a reply. Clipboard watch picks it up. **Read clipboard** is the fallback.
 
