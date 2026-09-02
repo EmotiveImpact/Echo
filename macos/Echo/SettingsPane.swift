@@ -46,8 +46,8 @@ struct SettingsPane: View {
             }
 
             Section("About") {
-                LabeledContent("Version", value: "0.3.0")
-                Text("Unsigned development build. First launch: xattr -cr ~/Downloads/Echo.app then open it. Edge Read Aloud has no published minute quota.")
+                LabeledContent("Version", value: "0.3.1")
+                Text("Unsigned development build. First launch: xattr -cr ~/Downloads/Echo/Echo.app then open it. Edge Read Aloud has no published minute quota.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

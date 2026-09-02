@@ -6,14 +6,14 @@ Copy a reply in Cursor. Echo speaks it. No project skill, no type-`ski` handshak
 
 Download the latest Mac build from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-- Apple Silicon: `Echo-0.3.0-arm64-mac.zip`
-- Intel Mac: `Echo-0.3.0-x64-mac.zip`
+- Apple Silicon: `Echo-0.3.1-arm64-mac.zip`
+- Intel Mac: `Echo-0.3.1-x64-mac.zip`
 
-Unzip into **Downloads**. macOS will say the unsigned app is **damaged**. That is Gatekeeper, not a bad binary. Double-click **Open Echo.command**, or run:
+Unzip into **Downloads** so the app is `~/Downloads/Echo/Echo.app`. macOS will say the unsigned app is **damaged**. That is Gatekeeper, not a bad binary. Double-click **Open Echo.command**, or run:
 
 ```bash
-xattr -cr ~/Downloads/Echo.app
-open ~/Downloads/Echo.app
+xattr -cr ~/Downloads/Echo/Echo.app
+open ~/Downloads/Echo/Echo.app
 ```
 
 Echo lives in the menu bar. Click the ear / waveform icon.
@@ -54,7 +54,7 @@ If you need a contract and a number, that is Azure Speech (for example F0, about
 ## Use it
 
 1. Quit older Hearback / Echo builds.
-2. Unzip `Echo.app` into `~/Downloads`.
+2. Unzip so the app is `~/Downloads/Echo/Echo.app`.
 3. Run the `xattr` commands above.
 4. Leave **Cursor** selected in the panel.
 5. Copy a reply in Cursor. Autoplay starts speaking.

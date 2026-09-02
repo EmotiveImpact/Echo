@@ -87,14 +87,14 @@ jobs:
 
             macOS will say the unsigned app is damaged. That is Gatekeeper.
 
-            Unzip into Downloads. Then double-click **Open Echo.command**, or run:
+            Unzip into Downloads. That should leave `~/Downloads/Echo/Echo.app`. Then double-click **Open Echo.command**, or run:
 
             ```
-            xattr -cr ~/Downloads/Echo.app
-            open ~/Downloads/Echo.app
+            xattr -cr ~/Downloads/Echo/Echo.app
+            open ~/Downloads/Echo/Echo.app
             ```
 
-            - **Apple Silicon Mac:** `Echo-0.3.0-arm64-mac.zip`
-            - **Intel Mac:** `Echo-0.3.0-x64-mac.zip`
+            - **Apple Silicon Mac:** `Echo-0.3.1-arm64-mac.zip`
+            - **Intel Mac:** `Echo-0.3.1-x64-mac.zip`
 
             Default listen mode is **Cursor only**. Switch to **Apps** or **All** in the menu panel.
