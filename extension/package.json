@@ -5,6 +5,11 @@
   "version": "0.1.0",
   "publisher": "hearback",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EmotiveImpact/Echo.git"
+  },
+  "homepage": "https://github.com/EmotiveImpact/Echo",
   "engines": {
     "vscode": "^1.96.0"
   },

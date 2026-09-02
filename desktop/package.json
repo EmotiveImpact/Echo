@@ -7,6 +7,11 @@
   "description": "Hear Cursor Agent responses with natural voices.",
   "author": "Hearback",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EmotiveImpact/Echo.git"
+  },
+  "homepage": "https://github.com/EmotiveImpact/Echo",
   "dependencies": {
     "@cursor/sdk": "1.0.30"
   },

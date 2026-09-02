@@ -83,6 +83,8 @@ npm run package:vsix
 ## Run locally
 
 ```bash
+git clone https://github.com/EmotiveImpact/Echo.git
+cd Echo
 npm install
 npm run dev
 ```
