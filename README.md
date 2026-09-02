@@ -6,14 +6,14 @@ No Electron. No Next.js. No `localhost:3000` bridge. One Rust binary.
 
 Download the latest Mac build from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-- Apple Silicon: `Echo-0.2.0-arm64-mac.zip`
-- Intel Mac: `Echo-0.2.0-x64-mac.zip`
+- Apple Silicon: `Echo-0.2.1-arm64-mac.zip`
+- Intel Mac: `Echo-0.2.1-x64-mac.zip`
 
-macOS will say the unsigned app is **damaged**. That is Gatekeeper. After unzipping, double-click **Open Echo.command**, or run:
+Unzip into **Downloads**. macOS will say the unsigned app is **damaged**. That is Gatekeeper. Double-click **Open Echo.command**, or run:
 
 ```bash
-xattr -cr /path/to/Echo.app
-open /path/to/Echo.app
+xattr -cr ~/Downloads/Echo.app
+open ~/Downloads/Echo.app
 ```
 
 ## What it does
@@ -26,8 +26,8 @@ open /path/to/Echo.app
 
 ## Use it
 
-1. Quit any old Hearback build.
-2. Open Echo.
+1. Quit Hearback. Drop `Echo.app` in `~/Downloads`.
+2. Run the two commands above.
 3. Paste a Cursor API key from [Cursor Settings](https://cursor.com/settings) and click **Connect Cursor**.
 4. Keep chatting. When a run finishes, Echo speaks it if Autoplay is on.
 5. Or copy a reply. Clipboard watch picks it up. **Read clipboard** is the fallback.
