@@ -6,6 +6,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   mac:
     runs-on: macos-15
@@ -21,9 +24,10 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix desktop
       - run: npm run build:desktop
-      - name: Build macOS DMG
-        run: npx electron-builder --projectDir desktop --config electron-builder.yml --mac dmg --${{ matrix.arch }}
+      - name: Build unsigned macOS zip and DMG
+        run: npx electron-builder --projectDir desktop --config electron-builder.yml --mac zip dmg --${{ matrix.arch }}
         env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -32,7 +36,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Hearback-macOS-${{ matrix.arch }}
-          path: artifacts/desktop/*.dmg
+          path: |
+            artifacts/desktop/*.dmg
+            artifacts/desktop/*.zip
 
   linux:
     runs-on: ubuntu-24.04
@@ -49,3 +55,29 @@ jobs:
         with:
           name: Hearback-Linux
           path: artifacts/desktop/*.AppImage
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [mac, linux]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Hearback ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
+          body: |
+            Download **Hearback** and run it.
+
+            - **Apple Silicon Mac:** `Hearback-0.1.0-arm64-mac.zip` or the arm64 DMG
+            - **Intel Mac:** `Hearback-0.1.0-mac.zip` or the x64 DMG
+            - **Linux:** AppImage
+
+            These builds are unsigned. On macOS: unzip, right-click **Hearback**, choose **Open**, then confirm.

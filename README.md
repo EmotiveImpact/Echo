@@ -1,5 +1,12 @@
 # Hearback
 
+Download the Mac app from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
+
+- Apple Silicon: `Hearback-*-arm64-mac.zip`
+- Intel Mac: `Hearback-*-x64-mac.zip`
+
+Unzip, right-click **Hearback**, choose **Open**. The first build is unsigned, so macOS will ask you to confirm.
+
 Click play on a Cursor agent reply and hear it back — the same interaction ChatGPT and Claude give you, without waiting for Cursor to ship a speaker icon on chat bubbles.
 
 Cursor does not expose a public API for injecting controls into Agent chat. Hearback sits in Cursor's Browser panel, captures completed Agent messages through the supported `afterAgentResponse` hook, and plays real MP3 audio in the page.

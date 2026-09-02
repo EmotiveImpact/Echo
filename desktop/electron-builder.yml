@@ -14,8 +14,10 @@ extraResources:
     to: companion
 mac:
   category: public.app-category.productivity
+  artifactName: Hearback-${version}-${arch}-mac.${ext}
   target:
     - dmg
+    - zip
   hardenedRuntime: true
   gatekeeperAssess: false
 linux:
