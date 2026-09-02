@@ -1,123 +1,59 @@
-# Hearback
+# Echo
 
-Download the Mac app from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
+A native Mac app that reads Cursor Agent replies out loud.
 
-- Apple Silicon: `Hearback-0.1.7-arm64-mac.zip`
-- Intel Mac: `Hearback-0.1.7-x64-mac.zip`
+No Electron. No Next.js. No `localhost:3000` bridge. One Rust binary.
 
-macOS will say the unsigned download is **damaged**. That is Gatekeeper, not a broken file. In Terminal:
+Download the latest Mac build from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-```bash
-xattr -cr /path/to/Hearback.app
-open /path/to/Hearback.app
-```
+- Apple Silicon: `Echo-0.2.0-arm64-mac.zip`
+- Intel Mac: `Echo-0.2.0-x64-mac.zip`
 
-Use the real path after you unzip (often `~/Downloads/Hearback.app`). Then the app opens.
-
-Click play on a Cursor agent reply and hear it back — the same interaction ChatGPT and Claude give you, without waiting for Cursor to ship a speaker icon on chat bubbles.
-
-Cursor does not expose a public API for injecting controls into Agent chat. Hearback sits in Cursor's Browser panel, captures completed Agent messages through the supported `afterAgentResponse` hook, and plays real MP3 audio in the page.
-
-## Desktop app
-
-Hearback Desktop is the scalable application:
-
-- **Connect Cursor** opens Cursor's official browser sign-in and stores the
-  resulting credential with Electron `safeStorage` (Keychain on macOS).
-- It checks the authenticated user's Cloud Agents every 20 seconds and imports
-  new completed run results.
-- Clipboard watch is on by default: copy a reply in Cursor and it appears in
-  Hearback. You can also click **Read clipboard** or use the menu bar icon.
-- <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> reads the clipboard when macOS
-  allows the shortcut. If another app already owns that combo, Hearback falls
-  back to <kbd>Cmd</kbd>+<kbd>Option</kbd>+<kbd>H</kbd>.
-- <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> opens Hearback, with
-  <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd> as a fallback.
-- Official Azure Speech credentials can be added in-app; they are encrypted at
-  rest. Without Azure, the alpha uses the unofficial Edge endpoint.
-
-Build the Linux alpha:
+macOS will say the unsigned app is **damaged**. That is Gatekeeper. After unzipping, double-click **Open Echo.command**, or run:
 
 ```bash
-npm ci
-npm ci --prefix desktop
-npm run package:desktop:linux
+xattr -cr /path/to/Echo.app
+open /path/to/Echo.app
 ```
 
-The AppImage is written to `artifacts/desktop/`. The macOS GitHub Actions job
-builds Intel and Apple Silicon DMGs. A publicly trusted release additionally
-requires Apple signing and notarization secrets.
+## What it does
 
-Unsigned development builds can also be produced without a Mac:
+- Plays Cursor replies with neural voices (Aria and friends) through Edge TTS.
+- Connects with a Cursor API key and imports finished Cloud Agent runs.
+- Watches the clipboard, so copying a reply is enough.
+- Registers a real OS hotkey (`⌘⇧H`, or `⌘⌥H` if the first combo is taken).
+- Still reads `~/.echo/responses.jsonl` from the repo hook, and the older `~/.hearback` file if it exists.
 
-```bash
-npx electron-builder --projectDir desktop --config electron-builder.yml --mac zip --arm64
-npx electron-builder --projectDir desktop --config electron-builder.yml --mac zip --x64
-```
+## Use it
 
-Use `Hearback-0.1.0-arm64-mac.zip` for Apple Silicon or
-`Hearback-0.1.0-mac.zip` for Intel. These unsigned builds are for testing;
-macOS may block them until the app is signed and notarized.
+1. Quit any old Hearback build.
+2. Open Echo.
+3. Paste a Cursor API key from [Cursor Settings](https://cursor.com/settings) and click **Connect Cursor**.
+4. Keep chatting. When a run finishes, Echo speaks it if Autoplay is on.
+5. Or copy a reply. Clipboard watch picks it up. **Read clipboard** is the fallback.
 
-## How to use it with Cursor
+Settings and the API key live in `~/.echo`.
 
-1. Keep Hearback open at `http://localhost:3000` in Cursor's Browser tab.
-2. Continue using Agent mode normally.
-3. When an Agent message completes, `.cursor/hooks/capture-response.mjs` stores the real response locally.
-4. Hearback discovers it automatically and enables **Play**.
-5. Click **Play**. The spoken sentence highlights as it plays.
-
-Manual paste remains available as a fallback. Code fences are skipped by default so you do not hear punctuation soup. Speed, voice, pause, and skip-sentence sit in the bar at the bottom.
-
-## Why this is not a Cursor plugin
-
-| Approach | Reality |
-| --- | --- |
-| Play button on Cursor bubbles | Cursor would have to ship this. There is no chat contribution API. |
-| MCP `speak` tools | The model must call a tool and duplicate the final response. |
-| Hearback | A supported response hook captures the message; the adjacent Browser panel supplies Play. |
-
-This works with Cursor Agent Chat and Cmd+K. Project hooks are supported by writable Cloud Agents.
-
-## Use in Cursor's Agent Window
-
-No VSIX is needed. Start a fresh Cloud Agent from the latest repository revision. The repository-managed environment automatically:
-
-- runs `npm ci`;
-- starts `npm run dev` on port 3000;
-- exposes the Hearback Browser preview; and
-- loads `.cursor/hooks.json`.
-
-Open `http://localhost:3000` in the Agent Window's Browser tab. The response that completes the current turn appears in Hearback.
-
-## Optional classic IDE extension
-
-The VSIX is only for Cursor's classic VS Code-style IDE, not the Agent Window. Build it with:
-
-```bash
-npm run package:vsix
-```
-
-## Run locally
+## Build from source
 
 ```bash
 git clone https://github.com/EmotiveImpact/Echo.git
 cd Echo
-npm install
-npm run dev
+cargo test
+cargo run --release
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Playback currently uses neural voices through `/api/tts` (no API key). The machine running Next.js needs outbound access to Microsoft Edge TTS.
+Needs Rust 1.88+. On Linux, install `libasound2-dev` and the usual X11/Wayland headers.
 
-```bash
-npm test
-npm run lint
-npm run build
-npm run package:vsix
-```
+The binary is `echo-desktop` so it does not shadow `/bin/echo`. The window title and Mac app name are **Echo**.
 
 ## Keyboard
 
-- <kbd>Space</kbd> play / pause
-- <kbd>⌘</kbd><kbd>Enter</kbd> or <kbd>Ctrl</kbd><kbd>Enter</kbd> listen to the paste
-- <kbd>←</kbd> <kbd>→</kbd> skip a sentence
+- `Space` play / pause
+- `←` `→` skip a sentence
+- `⌘⇧H` read clipboard (when Echo is focused, and globally if macOS allows it)
+- `⌘⇧O` bring Echo forward
+
+## Why this is not a Cursor plugin
+
+Cursor does not expose a play button on chat bubbles. Echo sits next to Cursor, captures finished replies, and speaks them.

@@ -1,0 +1,48 @@
+[package]
+name = "echo-desktop"
+version = "0.2.0"
+edition = "2021"
+description = "Echo plays Cursor Agent replies with neural voices."
+license = "UNLICENSED"
+repository = "https://github.com/EmotiveImpact/Echo"
+authors = ["Echo <emotiveimpact@gmail.com>"]
+
+[[bin]]
+name = "echo-desktop"
+path = "src/main.rs"
+
+[dependencies]
+arboard = "3"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+eframe = { version = "0.31", default-features = false, features = [
+    "default_fonts",
+    "glow",
+    "x11",
+    "wayland",
+] }
+egui = "0.31"
+futures-util = "0.3"
+global-hotkey = "0.6"
+hex = "0.4"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "rustls-tls",
+] }
+rodio = { version = "0.20", default-features = false, features = [
+    "symphonia-mp3",
+] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["rt-multi-thread", "time", "macros", "sync"] }
+tokio-tungstenite = { version = "0.26", features = [
+    "connect",
+    "rustls-tls-webpki-roots",
+] }
+uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

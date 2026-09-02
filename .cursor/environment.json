@@ -1,11 +1,4 @@
 {
-  "name": "Hearback Agent Mode",
-  "install": "npm ci",
-  "start": "npm run dev",
-  "ports": [
-    {
-      "name": "Hearback",
-      "port": 3000
-    }
-  ]
+  "name": "Echo",
+  "install": "sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libasound2-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev pkg-config libssl-dev && cargo test"
 }

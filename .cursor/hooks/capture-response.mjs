@@ -5,8 +5,9 @@ import { homedir } from "node:os"
 import { dirname } from "node:path"
 
 const EVENT_FILE =
+  process.env.ECHO_RESPONSE_FILE ??
   process.env.HEARBACK_RESPONSE_FILE ??
-  `${homedir()}/.hearback/responses.jsonl`
+  `${homedir()}/.echo/responses.jsonl`
 
 async function readStdin() {
   let input = ""
@@ -37,6 +38,6 @@ try {
 
   process.stdout.write('{"continue":true}\n')
 } catch (error) {
-  console.error("Hearback could not capture the Agent response:", error)
+  console.error("Echo could not capture the Agent response:", error)
   process.stdout.write('{"continue":true}\n')
 }

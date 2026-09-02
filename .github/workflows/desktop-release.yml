@@ -16,84 +16,37 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [arm64, x64]
+        include:
+          - arch: arm64
+            target: aarch64-apple-darwin
+          - arch: x64
+            target: x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: dtolnay/rust-toolchain@1.88.0
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm ci --prefix desktop
-      - run: npm run build:desktop
-      - name: Build unsigned macOS zip
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          targets: ${{ matrix.target }}
+      - name: Build Echo
+        run: cargo build --release --target ${{ matrix.target }}
+      - name: Package .app zip
         run: |
-          set -o pipefail
-          ./node_modules/.bin/electron-builder \
-            --projectDir desktop \
-            --config "$GITHUB_WORKSPACE/desktop/electron-builder.yml" \
-            --mac zip \
-            --${{ matrix.arch }} \
-            --publish never 2>&1 | tee builder.log
+          mkdir -p artifacts/desktop
+          bash packaging/package-macos.sh ${{ matrix.target }}
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: Hearback-macOS-${{ matrix.arch }}
+          name: Echo-macOS-${{ matrix.arch }}
           path: artifacts/desktop/*.zip
       - name: Publish builder error
         if: failure()
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
-            const log = fs.existsSync('builder.log') ? fs.readFileSync('builder.log', 'utf8') : 'no builder.log';
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Desktop Mac ${{ matrix.arch }} build failed`,
-              body: '```\n' + log.slice(-6000) + '\n```'
-            });
-
-  linux:
-    runs-on: ubuntu-24.04
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm ci --prefix desktop
-      - run: npm run build:desktop
-      - env:
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: |
-          set -o pipefail
-          ./node_modules/.bin/electron-builder \
-            --projectDir desktop \
-            --config "$GITHUB_WORKSPACE/desktop/electron-builder.yml" \
-            --linux AppImage \
-            --publish never 2>&1 | tee builder.log
-      - uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: Hearback-Linux
-          path: artifacts/desktop/*.AppImage
-      - name: Publish builder error
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const log = fs.existsSync('builder.log') ? fs.readFileSync('builder.log', 'utf8') : 'no builder.log';
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: 'Desktop Linux build failed',
-              body: '```\n' + log.slice(-6000) + '\n```'
+              title: `Echo Mac ${{ matrix.arch }} build failed`,
+              body: 'Native Rust build failed. Check the Actions log.'
             });
 
   release:
@@ -107,20 +60,21 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          name: Hearback ${{ github.ref_name }}
+          name: Echo ${{ github.ref_name }}
           generate_release_notes: true
           files: |
             dist/*.zip
-            dist/*.AppImage
           body: |
+            Echo is a native Mac app. No browser tab. No localhost server.
+
             macOS will say the unsigned app is damaged. That is Gatekeeper.
 
-            After unzipping, either double-click **Open Hearback.command**, or run:
+            After unzipping, either double-click **Open Echo.command**, or run:
 
             ```
-            xattr -cr /path/to/Hearback.app
-            open /path/to/Hearback.app
+            xattr -cr /path/to/Echo.app
+            open /path/to/Echo.app
             ```
 
-            - **Apple Silicon Mac:** `Hearback-0.1.7-arm64-mac.zip`
-            - **Intel Mac:** `Hearback-0.1.7-x64-mac.zip`
+            - **Apple Silicon Mac:** `Echo-0.2.0-arm64-mac.zip`
+            - **Intel Mac:** `Echo-0.2.0-x64-mac.zip`
