@@ -15,7 +15,7 @@ final class EchoStore: ObservableObject {
     @Published var currentLine = ""
     @Published var errorMessage: String?
     @Published var lastIgnoredReason: String?
-    @Published var page: PanelPage = .home
+    @Published var showingAppPicker = false
 
     private let watcher = ClipboardWatcher()
     private let player = SpeechPlayer()
@@ -60,18 +60,6 @@ final class EchoStore: ObservableObject {
 
     var activeReply: Reply? {
         replies.first(where: { $0.id == activeID })
-    }
-
-    func openSettings() {
-        page = .settings
-    }
-
-    func openApps() {
-        page = .apps
-    }
-
-    func goHome() {
-        page = .home
     }
 
     func handleCopy(_ text: String, app: NSRunningApplication?, force: Bool) {

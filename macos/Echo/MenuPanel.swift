@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuPanel: View {
     @EnvironmentObject private var store: EchoStore
+    @State private var showingSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,7 +24,18 @@ struct MenuPanel: View {
             queue
             footer
         }
+        .frame(width: 348)
         .background(PanelBackground())
+        .preferredColorScheme(.dark)
+        .sheet(isPresented: $store.showingAppPicker) {
+            AppPickerSheet()
+                .environmentObject(store)
+        }
+        .sheet(isPresented: $showingSettings) {
+            SettingsPane()
+                .environmentObject(store)
+                .frame(width: 380, height: 460)
+        }
     }
 
     private var header: some View {
@@ -70,7 +82,7 @@ struct MenuPanel: View {
 
             if store.settings.copyMode == .selected {
                 Button {
-                    store.openApps()
+                    store.showingAppPicker = true
                 } label: {
                     HStack {
                         Image(systemName: "app.badge.checkmark")
@@ -223,7 +235,7 @@ struct MenuPanel: View {
             .buttonStyle(.plain)
             .foregroundStyle(Color.accentColor)
             Button {
-                store.openSettings()
+                showingSettings = true
             } label: {
                 Image(systemName: "gearshape")
             }
