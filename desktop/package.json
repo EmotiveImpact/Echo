@@ -1,11 +1,14 @@
 {
   "name": "hearback-desktop",
   "desktopName": "Hearback",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "main": "dist/main.cjs",
   "description": "Hear Cursor Agent responses with natural voices.",
-  "author": "Hearback",
+  "author": {
+    "name": "Hearback",
+    "email": "emotiveimpact@gmail.com"
+  },
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
@@ -14,6 +17,9 @@
   "homepage": "https://github.com/EmotiveImpact/Echo",
   "dependencies": {
     "@cursor/sdk": "1.0.30"
+  },
+  "devDependencies": {
+    "electron": "^44.1.1"
   },
   "overrides": {
     "undici": "6.28.0"

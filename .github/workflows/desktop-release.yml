@@ -13,11 +13,12 @@ jobs:
   mac:
     runs-on: macos-15
     strategy:
+      fail-fast: false
       matrix:
         arch: [arm64, x64]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -25,14 +26,9 @@ jobs:
       - run: npm ci --prefix desktop
       - run: npm run build:desktop
       - name: Build unsigned macOS zip and DMG
-        run: npx electron-builder --projectDir desktop --config electron-builder.yml --mac zip dmg --${{ matrix.arch }}
+        run: npx electron-builder --projectDir desktop --config electron-builder.yml --mac --${{ matrix.arch }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - uses: actions/upload-artifact@v4
         with:
           name: Hearback-macOS-${{ matrix.arch }}
@@ -43,14 +39,15 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
       - run: npm ci
       - run: npm ci --prefix desktop
-      - run: npm run package:desktop:linux
+      - run: npm run build:desktop
+      - run: npx electron-builder --projectDir desktop --config electron-builder.yml --linux AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: Hearback-Linux
@@ -58,7 +55,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
-    needs: [mac, linux]
+    needs: [mac]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
@@ -74,10 +71,10 @@ jobs:
             dist/*.zip
             dist/*.AppImage
           body: |
-            Download **Hearback** and run it.
+            Download Hearback and run it.
 
-            - **Apple Silicon Mac:** `Hearback-0.1.0-arm64-mac.zip` or the arm64 DMG
-            - **Intel Mac:** `Hearback-0.1.0-mac.zip` or the x64 DMG
+            - **Apple Silicon Mac:** `Hearback-0.1.1-arm64-mac.zip`
+            - **Intel Mac:** `Hearback-0.1.1-x64-mac.zip`
             - **Linux:** AppImage
 
             These builds are unsigned. On macOS: unzip, right-click **Hearback**, choose **Open**, then confirm.

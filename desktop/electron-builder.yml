@@ -18,8 +18,9 @@ mac:
   target:
     - dmg
     - zip
-  hardenedRuntime: true
+  hardenedRuntime: false
   gatekeeperAssess: false
+  identity: null
 linux:
   category: Utility
   syncDesktopName: true
