@@ -17,7 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self.store = EchoStore()
             self.installStatusItem()
             self.buildPanel()
-            self.showPanel()
         }
     }
 
@@ -26,22 +25,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return true
     }
 
-    @objc func togglePanel() {
-        if let panel, panel.isVisible {
-            panel.orderOut(nil)
-        } else {
-            showPanel()
-        }
-    }
-
-    func showPanel() {
+    @objc func showPanel() {
         if panel == nil {
             MainActor.assumeIsolated {
                 self.buildPanel()
             }
         }
         positionPanel()
+        NSApp.activate(ignoringOtherApps: true)
+        panel?.deminiaturize(nil)
         panel?.makeKeyAndOrderFront(nil)
+        panel?.orderFrontRegardless()
+    }
+
+    @objc func hidePanel() {
+        panel?.orderOut(nil)
+    }
+
+    @objc func togglePanel() {
+        if let panel, panel.isVisible, NSScreen.screens.contains(where: { $0.visibleFrame.intersects(panel.frame) }) {
+            hidePanel()
+        } else {
+            showPanel()
+        }
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
@@ -53,15 +59,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func statusClicked(_ sender: Any?) {
-        guard let event = NSApp.currentEvent else {
-            togglePanel()
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.type == .rightMouseDown || event?.modifierFlags.contains(.control) == true {
+            popStatusMenu()
             return
         }
-        if event.type == .rightMouseUp {
-            showStatusMenu()
-        } else {
-            togglePanel()
-        }
+        togglePanel()
     }
 
     @objc private func quitApp() {
@@ -71,9 +74,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @MainActor
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.menu = nil
         item.button?.image = Self.makeIcon(store.statusSymbol)
         item.button?.imagePosition = .imageOnly
-        item.button?.toolTip = "Echo"
+        item.button?.toolTip = "Echo — click to open"
         item.button?.target = self
         item.button?.action = #selector(statusClicked(_:))
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -91,7 +95,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func buildPanel() {
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 600),
-            styleMask: [.titled, .closable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .nonactivatingPanel, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -99,9 +103,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.titlebarAppearsTransparent = true
         panel.titleVisibility = .hidden
         panel.isFloatingPanel = true
-        panel.level = .floating
+        panel.level = .statusBar
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
+        panel.worksWhenModal = true
+        panel.becomesKeyOnlyIfNeeded = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .moveToActiveSpace]
         panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
         panel.standardWindowButton(.zoomButton)?.isHidden = true
@@ -109,14 +115,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.delegate = self
 
         let hosting = NSHostingView(rootView: RootView().environmentObject(store))
+        hosting.frame = NSRect(x: 0, y: 0, width: 360, height: 600)
         panel.contentView = hosting
         panel.setContentSize(NSSize(width: 360, height: 600))
         self.panel = panel
     }
 
     private func positionPanel() {
-        guard let panel, let button = statusItem?.button, let buttonWindow = button.window else {
-            panel?.center()
+        guard let panel else { return }
+        panel.setContentSize(NSSize(width: 360, height: 600))
+        guard let button = statusItem?.button, let buttonWindow = button.window else {
+            panel.center()
             return
         }
         let buttonRect = button.convert(button.bounds, to: nil)
@@ -135,16 +144,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.setFrameOrigin(origin)
     }
 
-    private func showStatusMenu() {
+    private func popStatusMenu() {
         let menu = NSMenu()
-        menu.addItem(withTitle: "Show Echo", action: #selector(togglePanel), keyEquivalent: "")
+        let show = NSMenuItem(title: "Show Echo", action: #selector(showPanel), keyEquivalent: "")
+        show.target = self
+        menu.addItem(show)
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(withTitle: "Quit Echo", action: #selector(quitApp), keyEquivalent: "q")
-        statusItem?.menu = menu
-        statusItem?.button?.performClick(nil)
-        statusItem?.menu = nil
-        statusItem?.button?.target = self
-        statusItem?.button?.action = #selector(statusClicked(_:))
+        let quit = NSMenuItem(title: "Quit Echo", action: #selector(quitApp), keyEquivalent: "q")
+        quit.target = self
+        menu.addItem(quit)
+
+        guard let button = statusItem?.button else { return }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
     }
 
     private static func makeIcon(_ symbol: String) -> NSImage? {
