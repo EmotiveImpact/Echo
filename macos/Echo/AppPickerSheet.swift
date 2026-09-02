@@ -3,7 +3,7 @@ import SwiftUI
 
 struct AppPickerSheet: View {
     @EnvironmentObject private var store: EchoStore
-    @Environment(\.dismiss) private var dismiss
+    var onDone: () -> Void
     @State private var query = ""
     @State private var apps: [RunningAppInfo] = []
 
@@ -18,7 +18,7 @@ struct AppPickerSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Done") { dismiss() }
+                Button("Done", action: onDone)
                     .keyboardShortcut(.defaultAction)
             }
 
@@ -37,35 +37,46 @@ struct AppPickerSheet: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 160)
             } else {
-                List(filtered) { app in
-                    Toggle(isOn: Binding(
-                        get: { store.settings.allowedBundleIDs.contains(app.bundleID) },
-                        set: { _ in store.toggleAllowedApp(app.bundleID) }
-                    )) {
-                        HStack(spacing: 8) {
-                            if let icon = app.icon {
-                                Image(nsImage: icon)
-                                    .resizable()
-                                    .frame(width: 20, height: 20)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 4) {
+                        ForEach(filtered) { app in
+                            Button {
+                                store.toggleAllowedApp(app.bundleID)
+                            } label: {
+                                HStack(spacing: 8) {
+                                    if let icon = app.icon {
+                                        Image(nsImage: icon)
+                                            .resizable()
+                                            .frame(width: 20, height: 20)
+                                    }
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(app.name)
+                                        Text(app.bundleID)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    if store.settings.allowedBundleIDs.contains(app.bundleID) {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(Color.accentColor)
+                                    }
+                                }
+                                .padding(8)
+                                .background(
+                                    Color.white.opacity(0.04),
+                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                )
                             }
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(app.name)
-                                Text(app.bundleID)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .toggleStyle(.checkbox)
                 }
-                .listStyle(.inset)
+                .frame(minHeight: 220)
             }
         }
         .padding(16)
-        .frame(width: 420, height: 480)
-        .preferredColorScheme(.dark)
         .onAppear {
             apps = store.runningApps()
         }

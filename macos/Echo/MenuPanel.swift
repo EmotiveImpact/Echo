@@ -4,7 +4,30 @@ struct MenuPanel: View {
     @EnvironmentObject private var store: EchoStore
     @State private var showingSettings = false
 
+    @State private var showingApps = false
+
     var body: some View {
+        Group {
+            if showingSettings {
+                SettingsPane(
+                    onDone: { showingSettings = false },
+                    onPickApps: {
+                        showingSettings = false
+                        showingApps = true
+                    }
+                )
+            } else if showingApps {
+                AppPickerSheet(onDone: { showingApps = false })
+            } else {
+                home
+            }
+        }
+        .frame(width: 348)
+        .background(PanelBackground())
+        .preferredColorScheme(.dark)
+    }
+
+    private var home: some View {
         VStack(spacing: 0) {
             header
             Divider().opacity(0.35)
@@ -23,18 +46,6 @@ struct MenuPanel: View {
             }
             queue
             footer
-        }
-        .frame(width: 348)
-        .background(PanelBackground())
-        .preferredColorScheme(.dark)
-        .sheet(isPresented: $store.showingAppPicker) {
-            AppPickerSheet()
-                .environmentObject(store)
-        }
-        .sheet(isPresented: $showingSettings) {
-            SettingsPane()
-                .environmentObject(store)
-                .frame(width: 380, height: 460)
         }
     }
 
@@ -82,7 +93,7 @@ struct MenuPanel: View {
 
             if store.settings.copyMode == .selected {
                 Button {
-                    store.showingAppPicker = true
+                    showingApps = true
                 } label: {
                     HStack {
                         Image(systemName: "app.badge.checkmark")

@@ -2,7 +2,8 @@ import SwiftUI
 
 struct SettingsPane: View {
     @EnvironmentObject private var store: EchoStore
-    @Environment(\.dismiss) private var dismiss
+    var onDone: () -> Void
+    var onPickApps: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -10,72 +11,90 @@ struct SettingsPane: View {
                 Text("Settings")
                     .font(.headline)
                 Spacer()
-                Button("Done") {
-                    dismiss()
-                }
-                .keyboardShortcut(.cancelAction)
-                .keyboardShortcut(.defaultAction)
+                Button("Done", action: onDone)
+                    .keyboardShortcut(.cancelAction)
+                    .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
 
             Divider()
 
-            Form {
-                Section("Voice") {
-                    Picker("Voice", selection: $store.settings.voice) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    labeled("Voice") {
                         ForEach(VoiceOption.all) { voice in
-                            Text(voice.name).tag(voice.id)
+                            Button {
+                                store.settings.voice = voice.id
+                            } label: {
+                                HStack {
+                                    Text(voice.name)
+                                    Spacer()
+                                    if store.settings.voice == voice.id {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(Color.accentColor)
+                                    }
+                                }
+                                .padding(.vertical, 6)
+                            }
+                            .buttonStyle(.plain)
                         }
-                    }
-                    Slider(value: $store.settings.rate, in: 0.75...1.4, step: 0.05) {
-                        Text("Rate")
-                    } minimumValueLabel: {
-                        Text("Slow")
-                    } maximumValueLabel: {
-                        Text("Fast")
-                    }
-                    Text(String(format: "%.2f×", store.settings.rate))
-                        .foregroundStyle(.secondary)
-                }
 
-                Section("When to speak") {
-                    Picker("Listen for copies from", selection: $store.settings.copyMode) {
-                        ForEach(CopyMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
+                        HStack {
+                            Text("Rate")
+                            Spacer()
+                            Text(String(format: "%.2f×", store.settings.rate))
+                                .foregroundStyle(.secondary)
                         }
+                        .font(.system(size: 12))
+                        .padding(.top, 8)
+                        Slider(value: $store.settings.rate, in: 0.75...1.4, step: 0.05)
                     }
-                    Text(store.settings.copyMode.detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if store.settings.copyMode == .selected {
-                        Button("Choose apps…") {
-                            store.showingAppPicker = true
+
+                    labeled("When to speak") {
+                        Picker("Listen for copies from", selection: $store.settings.copyMode) {
+                            ForEach(CopyMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        Text(store.settings.copyMode.detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if store.settings.copyMode == .selected {
+                            Button("Choose apps", action: onPickApps)
+                                .buttonStyle(.plain)
+                                .foregroundStyle(Color.accentColor)
+                        }
+                        Toggle("Watch the clipboard", isOn: $store.settings.clipboardWatch)
+                        Toggle("Autoplay new copies", isOn: $store.settings.autoplay)
                     }
-                    Toggle("Watch the clipboard", isOn: $store.settings.clipboardWatch)
-                    Toggle("Autoplay new copies", isOn: $store.settings.autoplay)
-                }
 
-                Section("What to skip") {
-                    Toggle("Skip fenced code blocks", isOn: $store.settings.skipCode)
-                    Toggle("Say “link” instead of URLs", isOn: $store.settings.skipUrls)
-                }
+                    labeled("What to skip") {
+                        Toggle("Skip fenced code blocks", isOn: $store.settings.skipCode)
+                        Toggle("Say “link” instead of URLs", isOn: $store.settings.skipUrls)
+                    }
 
-                Section("About") {
-                    LabeledContent("Version", value: "0.3.5")
-                    Text("Unsigned development build. First launch: xattr -cr ~/Downloads/Echo/Echo.app then open it. Edge Read Aloud has no published minute quota.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    labeled("About") {
+                        LabeledContent("Version", value: "0.3.6")
+                        Text("Tap a voice name. Dropdown menus close this panel, so they are not used here.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .padding(16)
             }
-            .formStyle(.grouped)
         }
-        .frame(width: 380, height: 480)
-        .preferredColorScheme(.dark)
-        .sheet(isPresented: $store.showingAppPicker) {
-            AppPickerSheet()
-                .environmentObject(store)
+    }
+
+    private func labeled(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            content()
         }
     }
 }

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ARCH="${1:?usage: package-swift-macos.sh <arm64|x86_64|x64>}"
-VERSION="0.3.5"
+VERSION="0.3.6"
 APP="$ROOT/macos/DerivedData/Build/Products/Release/Echo.app"
 OUT="$ROOT/artifacts/desktop"
 STAGE="$OUT/Echo"
