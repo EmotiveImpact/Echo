@@ -3,6 +3,8 @@ name: Desktop installers
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -18,24 +20,38 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            target: aarch64-apple-darwin
-          - arch: x64
-            target: x86_64-apple-darwin
+            label: arm64
+          - arch: x86_64
+            label: x64
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@1.88.0
-        with:
-          targets: ${{ matrix.target }}
-      - name: Build Echo
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate icons
+        run: python3 macos/scripts/generate-icon.py
+      - name: Build Echo.app
+        run: |
+          cd macos
+          xcodegen generate
+          xcodebuild \
+            -project Echo.xcodeproj \
+            -scheme Echo \
+            -configuration Release \
+            -derivedDataPath DerivedData \
+            ARCHS=${{ matrix.arch }} \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY= \
+            DEVELOPMENT_TEAM= \
+            MACOSX_DEPLOYMENT_TARGET=14.0
       - name: Package .app zip
         run: |
-          mkdir -p artifacts/desktop
-          bash packaging/package-macos.sh ${{ matrix.target }}
+          bash packaging/package-swift-macos.sh ${{ matrix.label }}
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: Echo-macOS-${{ matrix.arch }}
+          name: Echo-macOS-${{ matrix.label }}
           path: artifacts/desktop/*.zip
       - name: Publish builder error
         if: failure()
@@ -46,7 +62,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `Echo Mac ${{ matrix.arch }} build failed`,
-              body: 'Native Rust build failed. Check the Actions log.'
+              body: 'SwiftUI Mac build failed. Check the Actions log.'
             });
 
   release:
@@ -65,7 +81,9 @@ jobs:
           files: |
             dist/*.zip
           body: |
-            Echo is a native Mac app. No browser tab. No localhost server.
+            Echo is a SwiftUI menu-bar Mac app. Copy a Cursor reply. It speaks.
+
+            No skill. No Cursor Connect. No paid Apple signing for your own machine.
 
             macOS will say the unsigned app is damaged. That is Gatekeeper.
 
@@ -76,5 +94,7 @@ jobs:
             open ~/Downloads/Echo.app
             ```
 
-            - **Apple Silicon Mac:** `Echo-0.2.2-arm64-mac.zip`
-            - **Intel Mac:** `Echo-0.2.2-x64-mac.zip`
+            - **Apple Silicon Mac:** `Echo-0.3.0-arm64-mac.zip`
+            - **Intel Mac:** `Echo-0.3.0-x64-mac.zip`
+
+            Default listen mode is **Cursor only**. Switch to **Apps** or **All** in the menu panel.

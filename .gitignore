@@ -7,3 +7,7 @@
 .env*
 /artifacts
 /coverage
+macos/Echo.xcodeproj
+macos/DerivedData
+xcuserdata
+*.xcuserstate
