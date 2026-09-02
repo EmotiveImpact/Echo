@@ -1,0 +1,32 @@
+appId: com.hearback.desktop
+productName: Hearback
+asar: true
+npmRebuild: false
+directories:
+  output: ../artifacts/desktop
+files:
+  - dist/**
+  - node_modules/**
+  - package.json
+extraResources:
+  - from: companion
+    to: companion
+mac:
+  category: public.app-category.productivity
+  target:
+    - dmg
+  hardenedRuntime: true
+  gatekeeperAssess: false
+linux:
+  category: Utility
+  target:
+    - AppImage
+    - deb
+  artifactName: Hearback-${version}-${arch}.${ext}
+win:
+  target:
+    - nsis
+  artifactName: Hearback-Setup-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "r
 import {
   AudioLinesIcon,
   CircleCheckIcon,
+  CloudIcon,
   Link2Icon,
   Loader2Icon,
+  LogOutIcon,
   TriangleAlertIcon,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -14,11 +16,19 @@ import { PasteComposer } from "@/components/paste-composer"
 import { PlayerDock } from "@/components/player-dock"
 import { ReplyCard } from "@/components/reply-card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   getCursorResponseServerSnapshot,
   getCursorResponseSnapshot,
   subscribeCursorResponses,
 } from "@/lib/cursor-response-store"
+import {
+  connectCursor,
+  disconnectCursor,
+  getDesktopServerSnapshot,
+  getDesktopSnapshot,
+  subscribeDesktop,
+} from "@/lib/desktop-store"
 import {
   addReply,
   getHearbackServerSnapshot,
@@ -44,15 +54,21 @@ export function HearbackApp() {
     getCursorResponseSnapshot,
     getCursorResponseServerSnapshot
   )
+  const desktop = useSyncExternalStore(
+    subscribeDesktop,
+    getDesktopSnapshot,
+    getDesktopServerSnapshot
+  )
   const { voices } = useVoices()
   const { replies: manualReplies, settings } = store
   const replies = useMemo(() => {
-    const capturedIds = new Set(cursor.responses.map((reply) => reply.id))
+    const captured = [...desktop.responses, ...cursor.responses]
+    const capturedIds = new Set(captured.map((reply) => reply.id))
     return [
-      ...cursor.responses,
+      ...captured,
       ...manualReplies.filter((reply) => !capturedIds.has(reply.id)),
     ]
-  }, [cursor.responses, manualReplies])
+  }, [cursor.responses, desktop.responses, manualReplies])
   const snapshotRef = useRef(snapshot)
   const repliesRef = useRef(replies)
 
@@ -190,11 +206,72 @@ export function HearbackApp() {
               </p>
             </div>
           </div>
-          <ConnectionBadge status={cursor.status} />
+          <ConnectionBadge
+            status={cursor.status}
+            desktopAvailable={desktop.available}
+            desktopAuth={desktop.authStatus}
+          />
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-3xl flex-1 space-y-3 px-3 py-3 pb-44 sm:px-4 sm:py-4">
+        {desktop.available ? (
+          <section className="rounded-xl border border-border/80 bg-card/70 p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+                  <CloudIcon className="size-4" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {desktop.authStatus === "connected"
+                      ? "Cursor Cloud connected"
+                      : "Connect Cursor Cloud"}
+                  </p>
+                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                    {desktop.authStatus === "connected"
+                      ? `${desktop.email ?? "Signed in"} · checking completed runs every 20 seconds`
+                      : "Sign in through Cursor to discover completed Agent Window runs automatically."}
+                  </p>
+                </div>
+              </div>
+              {desktop.authStatus === "connected" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void disconnectCursor()}
+                >
+                  <LogOutIcon data-icon="inline-start" />
+                  Disconnect
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={desktop.authStatus === "checking"}
+                  onClick={() => void connectCursor()}
+                >
+                  {desktop.authStatus === "checking" ? (
+                    <Loader2Icon className="animate-spin" data-icon="inline-start" />
+                  ) : (
+                    <CloudIcon data-icon="inline-start" />
+                  )}
+                  Connect Cursor
+                </Button>
+              )}
+            </div>
+            {desktop.error ? (
+              <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {desktop.error}
+              </p>
+            ) : null}
+            <p className="mt-3 border-t border-border/70 pt-2 text-xs text-muted-foreground">
+              Global shortcuts: ⌘⌥H opens Hearback · ⌘⇧H reads the clipboard.
+            </p>
+          </section>
+        ) : null}
+
         <details className="group rounded-xl border border-border/70 bg-card/40">
           <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground">
             <span>Paste manually</span>
@@ -221,11 +298,14 @@ export function HearbackApp() {
               <Link2Icon className="size-4" />
             </div>
             <h2 className="mt-4 font-heading text-lg font-semibold">
-              Waiting for the next Agent reply
+              {desktop.available && desktop.authStatus !== "connected"
+                ? "Connect Cursor to begin"
+                : "Waiting for the next Agent reply"}
             </h2>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
-              This project installs a real Cursor response hook. When an Agent
-              message finishes, it appears here automatically—no copy and paste.
+              {desktop.available
+                ? "Completed Cloud Agent runs appear here automatically. You can always use the clipboard shortcut as a fallback."
+                : "This project installs a real Cursor response hook. When an Agent message finishes, it appears here automatically—no copy and paste."}
             </p>
             <p className="mt-4 text-xs text-muted-foreground">
               You can keep chatting in Agent mode with this Browser tab open.
@@ -296,9 +376,37 @@ export function HearbackApp() {
 
 function ConnectionBadge({
   status,
+  desktopAvailable,
+  desktopAuth,
 }: {
   status: "connecting" | "ready" | "connected" | "error"
+  desktopAvailable: boolean
+  desktopAuth: "checking" | "connected" | "disconnected" | "expired"
 }) {
+  if (desktopAvailable) {
+    if (desktopAuth === "checking") {
+      return (
+        <Badge variant="outline">
+          <Loader2Icon className="animate-spin" />
+          Checking Cursor
+        </Badge>
+      )
+    }
+    return (
+      <Badge
+        variant="outline"
+        className={
+          desktopAuth === "connected"
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+            : undefined
+        }
+      >
+        {desktopAuth === "connected" ? <CircleCheckIcon /> : <CloudIcon />}
+        {desktopAuth === "connected" ? "Cursor connected" : "Desktop ready"}
+      </Badge>
+    )
+  }
+
   if (status === "connecting") {
     return (
       <Badge variant="outline">

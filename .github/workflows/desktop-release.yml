@@ -1,0 +1,53 @@
+name: Desktop installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  mac:
+    runs-on: macos-15
+    strategy:
+      matrix:
+        arch: [arm64, x64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix desktop
+      - run: npm run build:desktop
+      - name: Build macOS DMG
+        run: npx electron-builder --projectDir desktop --config electron-builder.yml --mac dmg --${{ matrix.arch }}
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hearback-macOS-${{ matrix.arch }}
+          path: artifacts/desktop/*.dmg
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix desktop
+      - run: npm run package:desktop:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hearback-Linux
+          path: |
+            artifacts/desktop/*.AppImage
+            artifacts/desktop/*.deb

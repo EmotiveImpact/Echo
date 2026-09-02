@@ -1,0 +1,12 @@
+{
+  "name": "hearback-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.cjs",
+  "description": "Hear Cursor Agent responses with natural voices.",
+  "author": "Hearback",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@cursor/sdk": "1.0.30"
+  }
+}
