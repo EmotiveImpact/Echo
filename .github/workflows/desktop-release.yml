@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 jobs:
   mac:
@@ -25,19 +26,38 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix desktop
       - run: npm run build:desktop
-      - name: Build unsigned macOS zip and DMG
-        run: npx electron-builder --projectDir desktop --config electron-builder.yml --mac --${{ matrix.arch }}
+      - name: Build unsigned macOS zip
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          set -o pipefail
+          ./node_modules/.bin/electron-builder \
+            --projectDir desktop \
+            --config "$GITHUB_WORKSPACE/desktop/electron-builder.yml" \
+            --mac zip \
+            --${{ matrix.arch }} 2>&1 | tee builder.log
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: Hearback-macOS-${{ matrix.arch }}
-          path: |
-            artifacts/desktop/*.dmg
-            artifacts/desktop/*.zip
+          path: artifacts/desktop/*.zip
+      - name: Publish builder error
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.existsSync('builder.log') ? fs.readFileSync('builder.log', 'utf8') : 'no builder.log';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Desktop Mac ${{ matrix.arch }} build failed`,
+              body: '```\n' + log.slice(-6000) + '\n```'
+            });
 
   linux:
     runs-on: ubuntu-24.04
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -47,11 +67,32 @@ jobs:
       - run: npm ci
       - run: npm ci --prefix desktop
       - run: npm run build:desktop
-      - run: npx electron-builder --projectDir desktop --config electron-builder.yml --linux AppImage
+      - env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          set -o pipefail
+          ./node_modules/.bin/electron-builder \
+            --projectDir desktop \
+            --config "$GITHUB_WORKSPACE/desktop/electron-builder.yml" \
+            --linux AppImage 2>&1 | tee builder.log
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: Hearback-Linux
           path: artifacts/desktop/*.AppImage
+      - name: Publish builder error
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.existsSync('builder.log') ? fs.readFileSync('builder.log', 'utf8') : 'no builder.log';
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Desktop Linux build failed',
+              body: '```\n' + log.slice(-6000) + '\n```'
+            });
 
   release:
     if: startsWith(github.ref, 'refs/tags/')
@@ -67,14 +108,12 @@ jobs:
           name: Hearback ${{ github.ref_name }}
           generate_release_notes: true
           files: |
-            dist/*.dmg
             dist/*.zip
             dist/*.AppImage
           body: |
             Download Hearback and run it.
 
-            - **Apple Silicon Mac:** `Hearback-0.1.1-arm64-mac.zip`
-            - **Intel Mac:** `Hearback-0.1.1-x64-mac.zip`
-            - **Linux:** AppImage
+            - **Apple Silicon Mac:** `Hearback-0.1.2-arm64-mac.zip`
+            - **Intel Mac:** `Hearback-0.1.2-x64-mac.zip`
 
-            These builds are unsigned. On macOS: unzip, right-click **Hearback**, choose **Open**, then confirm.
+            Unzip, right-click **Hearback**, choose **Open**.
