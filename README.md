@@ -30,6 +30,17 @@ The AppImage is written to `artifacts/desktop/`. The macOS GitHub Actions job
 builds Intel and Apple Silicon DMGs. A publicly trusted release additionally
 requires Apple signing and notarization secrets.
 
+Unsigned development builds can also be produced without a Mac:
+
+```bash
+npx electron-builder --projectDir desktop --config electron-builder.yml --mac zip --arm64
+npx electron-builder --projectDir desktop --config electron-builder.yml --mac zip --x64
+```
+
+Use `Hearback-0.1.0-arm64-mac.zip` for Apple Silicon or
+`Hearback-0.1.0-mac.zip` for Intel. These unsigned builds are for testing;
+macOS may block them until the app is signed and notarized.
+
 ## How to use it with Cursor
 
 1. Keep Hearback open at `http://localhost:3000` in Cursor's Browser tab.
