@@ -51,10 +51,9 @@ final class EchoStore: ObservableObject {
 
     var statusSymbol: String {
         switch status {
-        case .playing: return "waveform"
-        case .loading: return "ellipsis.circle"
-        case .paused: return "pause.circle"
-        case .idle: return settings.clipboardWatch ? "ear" : "ear.slash"
+        case .playing, .loading: return "speaker.wave.2.fill"
+        case .paused: return "speaker.wave.2"
+        case .idle: return settings.clipboardWatch ? "speaker.wave.2.fill" : "speaker.slash"
         }
     }
 

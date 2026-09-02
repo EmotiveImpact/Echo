@@ -28,6 +28,9 @@ enum CopyFilter {
     }
 
     static func allows(app: NSRunningApplication?, settings: AppSettings) -> Bool {
+        if AppIdentity.isEcho(app) {
+            return false
+        }
         switch settings.copyMode {
         case .all:
             return true

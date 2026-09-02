@@ -4,6 +4,7 @@ struct SettingsPane: View {
     @EnvironmentObject private var store: EchoStore
     var onDone: () -> Void
     var onPickApps: () -> Void
+    @State private var voiceOpen = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,21 +24,43 @@ struct SettingsPane: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     labeled("Voice") {
-                        ForEach(VoiceOption.all) { voice in
-                            Button {
-                                store.settings.voice = voice.id
-                            } label: {
-                                HStack {
-                                    Text(voice.name)
-                                    Spacer()
-                                    if store.settings.voice == voice.id {
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(Color.accentColor)
-                                    }
-                                }
-                                .padding(.vertical, 6)
+                        Button {
+                            voiceOpen.toggle()
+                        } label: {
+                            HStack {
+                                Text(currentVoiceName)
+                                Spacer()
+                                Image(systemName: voiceOpen ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary)
                             }
-                            .buttonStyle(.plain)
+                            .padding(8)
+                            .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+
+                        if voiceOpen {
+                            VStack(spacing: 0) {
+                                ForEach(VoiceOption.all) { voice in
+                                    Button {
+                                        store.settings.voice = voice.id
+                                        voiceOpen = false
+                                    } label: {
+                                        HStack {
+                                            Text(voice.name)
+                                            Spacer()
+                                            if store.settings.voice == voice.id {
+                                                Image(systemName: "checkmark")
+                                                    .foregroundStyle(Color.accentColor)
+                                            }
+                                        }
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 7)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         }
 
                         HStack {
@@ -47,7 +70,7 @@ struct SettingsPane: View {
                                 .foregroundStyle(.secondary)
                         }
                         .font(.system(size: 12))
-                        .padding(.top, 8)
+                        .padding(.top, 4)
                         Slider(value: $store.settings.rate, in: 0.75...1.4, step: 0.05)
                     }
 
@@ -77,15 +100,16 @@ struct SettingsPane: View {
                     }
 
                     labeled("About") {
-                        LabeledContent("Version", value: "0.3.6")
-                        Text("Tap a voice name. Dropdown menus close this panel, so they are not used here.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        LabeledContent("Version", value: "0.3.7")
                     }
                 }
                 .padding(16)
             }
         }
+    }
+
+    private var currentVoiceName: String {
+        VoiceOption.all.first(where: { $0.id == store.settings.voice })?.name ?? "Aria"
     }
 
     private func labeled(_ title: String, @ViewBuilder content: () -> some View) -> some View {

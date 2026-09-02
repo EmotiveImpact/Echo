@@ -9,7 +9,7 @@ struct EchoApp: App {
             MenuPanel()
                 .environmentObject(store)
         } label: {
-            Label("Echo", systemImage: store.statusSymbol)
+            Image(systemName: store.statusSymbol)
         }
         .menuBarExtraStyle(.window)
     }
