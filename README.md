@@ -6,8 +6,8 @@ Copy a reply in Cursor. Echo speaks it. No project skill, no type-`ski` handshak
 
 Download the latest Mac build from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-- Apple Silicon: `Echo-0.3.1-arm64-mac.zip`
-- Intel Mac: `Echo-0.3.1-x64-mac.zip`
+- Apple Silicon: `Echo-0.3.2-arm64-mac.zip`
+- Intel Mac: `Echo-0.3.2-x64-mac.zip`
 
 Unzip into **Downloads** so the app is `~/Downloads/Echo/Echo.app`. macOS will say the unsigned app is **damaged**. That is Gatekeeper, not a bad binary. Double-click **Open Echo.command**, or run:
 
@@ -45,7 +45,7 @@ Short snippets, bare URLs, and token-looking strings are ignored. Fenced code is
 
 ## Free voice API
 
-Echo uses Microsoft Edge Read Aloud (the same unofficial neural voices as before: Aria, Jenny, Andrew, …).
+Echo uses Microsoft Edge Read Aloud (the same unofficial neural voices as before: Aria, Jenny, Andrew, …). There is no sign-in and no API key. A public client token is sent to `speech.platform.bing.com`.
 
 There is **no published free-tier minute or hour quota**. It is not a metered “X minutes/month” product. Light daily use often just keeps working. Hammer it and you can get throttled (HTTP 429). Microsoft can rotate tokens and the voices can break without notice.
 

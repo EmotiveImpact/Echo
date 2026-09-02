@@ -1,6 +1,12 @@
 import AppKit
 import Foundation
 
+enum PanelPage {
+    case home
+    case settings
+    case apps
+}
+
 enum CopyMode: String, Codable, CaseIterable, Identifiable {
     case cursor
     case selected
