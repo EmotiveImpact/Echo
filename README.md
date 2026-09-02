@@ -2,8 +2,8 @@
 
 Download the Mac app from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-- Apple Silicon: `Hearback-0.1.2-arm64-mac.zip`
-- Intel Mac: `Hearback-0.1.2-x64-mac.zip`
+- Apple Silicon: `Hearback-0.1.3-arm64-mac.zip`
+- Intel Mac: `Hearback-0.1.3-x64-mac.zip`
 
 Unzip, right-click **Hearback**, choose **Open**. The first build is unsigned, so macOS will ask you to confirm.
 
