@@ -130,7 +130,7 @@ function initialize() {
     replace({ ...snapshot, responses, error: null })
   })
   const offError = bridge.onCursorError((error) => {
-    replace({ ...snapshot, error })
+    replace({ ...snapshot, error: error || null })
   })
   teardown = () => {
     offResponse()

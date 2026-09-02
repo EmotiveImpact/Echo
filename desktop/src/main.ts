@@ -1,8 +1,9 @@
 import { spawn, type ChildProcess } from "node:child_process"
 import { readFile, rm, writeFile } from "node:fs/promises"
+import { homedir } from "node:os"
 import path from "node:path"
 
-import { Cursor } from "@cursor/sdk"
+import { Agent, Cursor } from "@cursor/sdk"
 import {
   app,
   BrowserWindow,
@@ -22,6 +23,9 @@ const TERMINAL_STATUSES = new Set([
   "ERROR",
   "CANCELLED",
   "EXPIRED",
+  "finished",
+  "error",
+  "cancelled",
 ])
 
 type CursorAgent = {
@@ -63,6 +67,7 @@ let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let server: ChildProcess | null = null
 let monitor: ReturnType<typeof setInterval> | null = null
+let hookMonitor: ReturnType<typeof setInterval> | null = null
 let monitoring = false
 let delivered = new Set<string>()
 let quitting = false
@@ -81,6 +86,7 @@ app.whenReady().then(async () => {
   createWindow()
   createTray()
   registerShortcuts()
+  startHookWatch()
   await startMonitoring()
 })
 
@@ -94,6 +100,7 @@ app.on("activate", () => showWindow())
 
 app.on("before-quit", () => {
   if (monitor) clearInterval(monitor)
+  if (hookMonitor) clearInterval(hookMonitor)
   globalShortcut.unregisterAll()
   server?.kill()
 })
@@ -247,43 +254,87 @@ async function pollCursor(key: string) {
   monitoring = true
 
   try {
-    const data = await cursorRequest<{ items?: CursorAgent[] }>(
-      "/v1/agents?limit=20",
-      key
-    )
-    const agents = data.items ?? []
-    const candidates = agents
-      .filter(
-        (agent) =>
-          typeof agent.latestRunId === "string" &&
-          !delivered.has(agent.latestRunId)
-      )
-      .slice(0, 3)
+    const agents = await listCloudAgents(key)
+    for (const agent of agents.slice(0, 8)) {
+      const runs = await listAgentRuns(agent.id, key)
+      for (const run of runs.slice(0, 4)) {
+        if (delivered.has(run.id)) continue
+        if (!TERMINAL_STATUSES.has(run.status)) continue
 
-    for (const agent of candidates) {
-      const runId = agent.latestRunId
-      if (!runId) continue
-      const run = await cursorRequest<CursorRun>(
-        `/v1/agents/${encodeURIComponent(agent.id)}/runs/${encodeURIComponent(runId)}`,
-        key
-      )
-      if (!TERMINAL_STATUSES.has(run.status)) continue
-
-      delivered.add(run.id)
-      await saveDelivered()
-      if (run.status === "FINISHED" && run.result?.trim()) {
-        emitResponse({
-          id: `cursor-api:${run.id}`,
-          text: run.result.trim(),
-          createdAt: Date.parse(run.updatedAt ?? agent.updatedAt ?? "") || Date.now(),
-          source: "cursor",
-        })
+        delivered.add(run.id)
+        await saveDelivered()
+        const text = run.result?.trim()
+        if ((run.status === "FINISHED" || run.status === "finished") && text) {
+          emitResponse({
+            id: `cursor-api:${run.id}`,
+            text,
+            createdAt:
+              Date.parse(run.updatedAt ?? agent.updatedAt ?? "") || Date.now(),
+            source: "cursor",
+          })
+        }
       }
     }
+    mainWindow?.webContents.send("hearback:cursor-error", "")
   } catch (error) {
+    if (isSkippableCursorError(error)) {
+      mainWindow?.webContents.send("hearback:cursor-error", "")
+      return
+    }
     mainWindow?.webContents.send("hearback:cursor-error", errorMessage(error))
   } finally {
     monitoring = false
+  }
+}
+
+async function listCloudAgents(key: string): Promise<CursorAgent[]> {
+  try {
+    const listed = await Agent.list({
+      runtime: "cloud",
+      apiKey: key,
+      limit: 20,
+      includeArchived: true,
+    })
+    return listed.items.map((agent) => ({
+      id: agent.agentId,
+      updatedAt: agent.lastModified
+        ? new Date(agent.lastModified).toISOString()
+        : undefined,
+    }))
+  } catch {
+    const data = await cursorRequest<{ items?: CursorAgent[] }>(
+      "/v1/agents?limit=20&includeArchived=true",
+      key
+    )
+    return data.items ?? []
+  }
+}
+
+async function listAgentRuns(agentId: string, key: string): Promise<CursorRun[]> {
+  try {
+    const listed = await Agent.listRuns(agentId, {
+      runtime: "cloud",
+      apiKey: key,
+      limit: 5,
+    })
+    return listed.items.map((run) => ({
+      id: run.id,
+      status: run.status,
+      result: run.result,
+      updatedAt: run.createdAt ? new Date(run.createdAt).toISOString() : undefined,
+    }))
+  } catch (error) {
+    if (isSkippableCursorError(error)) return []
+    try {
+      const data = await cursorRequest<{ items?: CursorRun[] }>(
+        `/v1/agents/${encodeURIComponent(agentId)}/runs?limit=5`,
+        key
+      )
+      return data.items ?? []
+    } catch (fallbackError) {
+      if (isSkippableCursorError(fallbackError)) return []
+      throw fallbackError
+    }
   }
 }
 
@@ -295,9 +346,64 @@ async function cursorRequest<T>(endpoint: string, apiKey: string): Promise<T> {
     },
   })
   if (!response.ok) {
-    throw new Error(`Cursor API returned ${response.status}.`)
+    const error = new Error(`Cursor API returned ${response.status}.`)
+    Object.assign(error, { status: response.status })
+    throw error
   }
   return (await response.json()) as T
+}
+
+function isSkippableCursorError(error: unknown) {
+  const status =
+    typeof error === "object" && error && "status" in error
+      ? Number((error as { status?: number }).status)
+      : Number(/\b(404|409|410)\b/.exec(errorMessage(error))?.[1])
+  return status === 404 || status === 409 || status === 410
+}
+
+function startHookWatch() {
+  if (hookMonitor) return
+  void pollHookFile()
+  hookMonitor = setInterval(() => void pollHookFile(), 2000)
+}
+
+async function pollHookFile() {
+  const file =
+    process.env.HEARBACK_RESPONSE_FILE ??
+    path.join(homedir(), ".hearback", "responses.jsonl")
+  let contents: string
+  try {
+    contents = await readFile(file, "utf8")
+  } catch {
+    return
+  }
+
+  for (const line of contents.split("\n")) {
+    if (!line.trim()) continue
+    try {
+      const parsed = JSON.parse(line) as Partial<CapturedResponse> & {
+        id?: string
+      }
+      if (
+        typeof parsed.id !== "string" ||
+        typeof parsed.text !== "string" ||
+        typeof parsed.createdAt !== "number"
+      ) {
+        continue
+      }
+      if (delivered.has(parsed.id)) continue
+      delivered.add(parsed.id)
+      emitResponse({
+        id: parsed.id,
+        text: parsed.text,
+        createdAt: parsed.createdAt,
+        source: "cursor",
+      })
+    } catch {
+      // Ignore a partial final line while the hook is still writing.
+    }
+  }
+  await saveDelivered()
 }
 
 async function captureClipboard() {
