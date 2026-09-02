@@ -2,12 +2,10 @@ import AppKit
 import Combine
 import SwiftUI
 
-@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     static private(set) var shared: AppDelegate?
 
-    let store = EchoStore()
-
+    private var store: EchoStore!
     private var statusItem: NSStatusItem?
     private var panel: NSPanel?
     private var iconCancellable: AnyCancellable?
@@ -15,9 +13,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
         NSApp.setActivationPolicy(.accessory)
-        installStatusItem()
-        buildPanel()
-        showPanel()
+        MainActor.assumeIsolated {
+            self.store = EchoStore()
+            self.installStatusItem()
+            self.buildPanel()
+            self.showPanel()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -35,10 +36,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func showPanel() {
         if panel == nil {
-            buildPanel()
+            MainActor.assumeIsolated {
+                self.buildPanel()
+            }
         }
         positionPanel()
         panel?.makeKeyAndOrderFront(nil)
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        Task { @MainActor in
+            self.store.goHome()
+        }
+        sender.orderOut(nil)
+        return false
     }
 
     @objc private func statusClicked(_ sender: Any?) {
@@ -53,19 +64,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        store.goHome()
-        sender.orderOut(nil)
-        return false
-    }
-
     @objc private func quitApp() {
         NSApp.terminate(nil)
     }
 
+    @MainActor
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = statusImage()
+        item.button?.image = Self.makeIcon(store.statusSymbol)
         item.button?.imagePosition = .imageOnly
         item.button?.toolTip = "Echo"
         item.button?.target = self
@@ -75,11 +81,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         iconCancellable = store.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in
-                self?.statusItem?.button?.image = self?.statusImage()
+                guard let self else { return }
+                self.statusItem?.button?.image = Self.makeIcon(self.store.statusSymbol)
             }
         }
     }
 
+    @MainActor
     private func buildPanel() {
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 360, height: 600),
@@ -100,10 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         panel.backgroundColor = NSColor(calibratedWhite: 0.08, alpha: 0.96)
         panel.delegate = self
 
-        let root = RootView()
-            .environmentObject(store)
-        let hosting = NSHostingView(rootView: root)
-        hosting.sizingOptions = [.preferredSize]
+        let hosting = NSHostingView(rootView: RootView().environmentObject(store))
         panel.contentView = hosting
         panel.setContentSize(NSSize(width: 360, height: 600))
         self.panel = panel
@@ -142,8 +147,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusItem?.button?.action = #selector(statusClicked(_:))
     }
 
-    private func statusImage() -> NSImage? {
-        let image = NSImage(systemSymbolName: store.statusSymbol, accessibilityDescription: "Echo")
+    private static func makeIcon(_ symbol: String) -> NSImage? {
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "Echo")
         image?.isTemplate = true
         return image
     }
