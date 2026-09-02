@@ -113,9 +113,14 @@ jobs:
             dist/*.zip
             dist/*.AppImage
           body: |
-            Download Hearback and run it.
+            macOS will say the unsigned app is damaged. That is Gatekeeper.
 
-            - **Apple Silicon Mac:** `Hearback-0.1.3-arm64-mac.zip`
-            - **Intel Mac:** `Hearback-0.1.3-x64-mac.zip`
+            After unzipping, either double-click **Open Hearback.command**, or run:
 
-            Unzip, right-click **Hearback**, choose **Open**.
+            ```
+            xattr -cr /path/to/Hearback.app
+            open /path/to/Hearback.app
+            ```
+
+            - **Apple Silicon Mac:** `Hearback-0.1.4-arm64-mac.zip`
+            - **Intel Mac:** `Hearback-0.1.4-x64-mac.zip`

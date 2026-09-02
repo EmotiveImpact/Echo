@@ -2,10 +2,17 @@
 
 Download the Mac app from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-- Apple Silicon: `Hearback-0.1.3-arm64-mac.zip`
-- Intel Mac: `Hearback-0.1.3-x64-mac.zip`
+- Apple Silicon: `Hearback-0.1.4-arm64-mac.zip`
+- Intel Mac: `Hearback-0.1.4-x64-mac.zip`
 
-Unzip, right-click **Hearback**, choose **Open**. The first build is unsigned, so macOS will ask you to confirm.
+macOS will say the unsigned download is **damaged**. That is Gatekeeper, not a broken file. In Terminal:
+
+```bash
+xattr -cr /path/to/Hearback.app
+open /path/to/Hearback.app
+```
+
+Use the real path after you unzip (often `~/Downloads/Hearback.app`). Then the app opens.
 
 Click play on a Cursor agent reply and hear it back — the same interaction ChatGPT and Claude give you, without waiting for Cursor to ship a speaker icon on chat bubbles.
 

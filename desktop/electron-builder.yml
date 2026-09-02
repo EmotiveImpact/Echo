@@ -4,6 +4,7 @@ electronVersion: 44.1.1
 asar: true
 npmRebuild: false
 publish: null
+afterPack: after-pack.cjs
 directories:
   output: ../artifacts/desktop
 files:
