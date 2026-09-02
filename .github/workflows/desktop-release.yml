@@ -48,6 +48,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Hearback-Linux
-          path: |
-            artifacts/desktop/*.AppImage
-            artifacts/desktop/*.deb
+          path: artifacts/desktop/*.AppImage

@@ -8,7 +8,7 @@
     "build:desktop": "next build && node scripts/build-desktop.mjs",
     "build:extension": "next build && node scripts/build-extension.mjs",
     "desktop": "npm run build:desktop && electron desktop",
-    "package:desktop:linux": "npm run build:desktop && electron-builder --projectDir desktop --config electron-builder.yml --linux AppImage deb",
+    "package:desktop:linux": "npm run build:desktop && electron-builder --projectDir desktop --config electron-builder.yml --linux AppImage",
     "package:desktop:mac": "npm run build:desktop && electron-builder --projectDir desktop --config electron-builder.yml --mac dmg",
     "package:desktop:win": "npm run build:desktop && electron-builder --projectDir desktop --config electron-builder.yml --win nsis",
     "package:vsix": "npm run build:extension && cd extension && vsce package --no-dependencies --allow-missing-repository --out ../artifacts/hearback-0.1.0.vsix",

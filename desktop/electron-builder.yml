@@ -22,7 +22,6 @@ linux:
   category: Utility
   target:
     - AppImage
-    - deb
   artifactName: Hearback-${version}-${arch}.${ext}
 win:
   target:
