@@ -1,5 +1,6 @@
 {
   "name": "hearback-desktop",
+  "desktopName": "Hearback",
   "version": "0.1.0",
   "private": true,
   "main": "dist/main.cjs",
@@ -8,5 +9,8 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@cursor/sdk": "1.0.30"
+  },
+  "overrides": {
+    "undici": "6.28.0"
   }
 }

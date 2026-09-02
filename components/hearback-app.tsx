@@ -15,6 +15,7 @@ import { toast } from "sonner"
 import { PasteComposer } from "@/components/paste-composer"
 import { PlayerDock } from "@/components/player-dock"
 import { ReplyCard } from "@/components/reply-card"
+import { DesktopVoiceSettings } from "@/components/desktop-settings"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -267,9 +268,13 @@ export function HearbackApp() {
               </p>
             ) : null}
             <p className="mt-3 border-t border-border/70 pt-2 text-xs text-muted-foreground">
-              Global shortcuts: ⌘⌥H opens Hearback · ⌘⇧H reads the clipboard.
+              Global shortcuts: ⌘⇧Space opens Hearback · ⌘⇧H reads the clipboard.
             </p>
           </section>
+        ) : null}
+
+        {desktop.available ? (
+          <DesktopVoiceSettings configured={desktop.azureConfigured} />
         ) : null}
 
         <details className="group rounded-xl border border-border/70 bg-card/40">

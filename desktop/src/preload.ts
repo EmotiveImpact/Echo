@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld("hearbackDesktop", {
   connectCursor: () => ipcRenderer.invoke("hearback:cursor-connect"),
   disconnectCursor: () => ipcRenderer.invoke("hearback:cursor-disconnect"),
   readClipboard: () => ipcRenderer.invoke("hearback:read-clipboard"),
+  azureStatus: () => ipcRenderer.invoke("hearback:azure-status"),
+  saveAzure: (credentials: { key: string; region: string }) =>
+    ipcRenderer.invoke("hearback:azure-save", credentials),
+  clearAzure: () => ipcRenderer.invoke("hearback:azure-clear"),
+  synthesize: (text: string, voice: string) =>
+    ipcRenderer.invoke("hearback:tts-synthesize", text, voice),
   onResponse: (callback: (response: ResponsePayload) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, response: ResponsePayload) =>
       callback(response)

@@ -44,6 +44,21 @@ type CapturedResponse = {
   source: "cursor" | "manual"
 }
 
+type AzureCredentials = {
+  key: string
+  region: string
+}
+
+const ALLOWED_VOICES = new Set([
+  "en-US-AriaNeural",
+  "en-US-JennyNeural",
+  "en-US-AndrewNeural",
+  "en-US-EmmaNeural",
+  "en-US-GuyNeural",
+  "en-GB-SoniaNeural",
+  "en-GB-RyanNeural",
+])
+
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let server: ChildProcess | null = null
@@ -133,7 +148,7 @@ function createTray() {
 }
 
 function registerShortcuts() {
-  globalShortcut.register("CommandOrControl+Alt+H", () => showWindow())
+  globalShortcut.register("CommandOrControl+Shift+Space", () => showWindow())
   globalShortcut.register("CommandOrControl+Shift+H", () => captureClipboard())
 }
 
@@ -162,6 +177,36 @@ function registerIpc() {
     return { status: "disconnected" }
   })
   ipcMain.handle("hearback:read-clipboard", () => captureClipboard())
+  ipcMain.handle("hearback:azure-status", async () => ({
+    configured: Boolean(await readAzureCredentials()),
+  }))
+  ipcMain.handle(
+    "hearback:azure-save",
+    async (_event, credentials: AzureCredentials) => {
+      const key = credentials.key.trim()
+      const region = credentials.region.trim().toLowerCase()
+      if (!key || !/^[a-z0-9-]+$/.test(region)) {
+        throw new Error("Enter a valid Azure Speech key and region.")
+      }
+      await saveEncrypted(
+        azureCredentialsPath(),
+        JSON.stringify({ key, region })
+      )
+      return { configured: true }
+    }
+  )
+  ipcMain.handle("hearback:azure-clear", async () => {
+    await rm(azureCredentialsPath(), { force: true })
+    return { configured: false }
+  })
+  ipcMain.handle(
+    "hearback:tts-synthesize",
+    async (_event, text: string, voice: string) => {
+      const credentials = await readAzureCredentials()
+      if (!credentials) return null
+      return synthesizeAzure(text, voice, credentials)
+    }
+  )
 }
 
 async function cursorStatus() {
@@ -331,21 +376,91 @@ function quitApp() {
 }
 
 async function saveApiKey(apiKey: string) {
-  if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error("Secure credential storage is unavailable on this system.")
-  }
-  const encrypted = safeStorage.encryptString(apiKey).toString("base64")
-  await writeFile(credentialsPath(), encrypted, { mode: 0o600 })
+  await saveEncrypted(credentialsPath(), apiKey)
 }
 
 async function readApiKey() {
+  return readEncrypted(credentialsPath())
+}
+
+async function saveEncrypted(file: string, value: string) {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error("Secure credential storage is unavailable on this system.")
+  }
+  const encrypted = safeStorage.encryptString(value).toString("base64")
+  await writeFile(file, encrypted, { mode: 0o600 })
+}
+
+async function readEncrypted(file: string) {
   if (!safeStorage.isEncryptionAvailable()) return null
   try {
-    const encrypted = await readFile(credentialsPath(), "utf8")
+    const encrypted = await readFile(file, "utf8")
     return safeStorage.decryptString(Buffer.from(encrypted, "base64"))
   } catch {
     return null
   }
+}
+
+async function readAzureCredentials(): Promise<AzureCredentials | null> {
+  const raw = await readEncrypted(azureCredentialsPath())
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Partial<AzureCredentials>
+    if (typeof parsed.key !== "string" || typeof parsed.region !== "string") {
+      return null
+    }
+    return { key: parsed.key, region: parsed.region }
+  } catch {
+    return null
+  }
+}
+
+async function synthesizeAzure(
+  rawText: string,
+  requestedVoice: string,
+  credentials: AzureCredentials
+) {
+  const text = rawText.replace(/\s+/g, " ").trim().slice(0, 400)
+  if (!text) throw new Error("Nothing to speak.")
+  const voice = ALLOWED_VOICES.has(requestedVoice)
+    ? requestedVoice
+    : "en-US-AriaNeural"
+  const locale = voice.split("-").slice(0, 2).join("-")
+  const ssml = `<speak version="1.0" xml:lang="${locale}"><voice name="${voice}">${escapeXml(text)}</voice></speak>`
+  const response = await fetch(
+    `https://${credentials.region}.tts.speech.microsoft.com/cognitiveservices/v1`,
+    {
+      method: "POST",
+      headers: {
+        "Ocp-Apim-Subscription-Key": credentials.key,
+        "Content-Type": "application/ssml+xml",
+        "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
+        "User-Agent": "Hearback Desktop",
+      },
+      body: ssml,
+    }
+  )
+  if (!response.ok) {
+    throw new Error(`Azure Speech returned ${response.status}.`)
+  }
+  const audio = new Uint8Array(await response.arrayBuffer())
+  if (audio.byteLength < 64) {
+    throw new Error("Azure Speech returned empty audio.")
+  }
+  return audio
+}
+
+function escapeXml(value: string) {
+  return value.replace(/[<>&"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "<": "&lt;",
+      ">": "&gt;",
+      "&": "&amp;",
+      '"': "&quot;",
+      "'": "&apos;",
+    }
+    return entities[character] ?? character
+  })
 }
 
 async function loadDelivered() {
@@ -369,6 +484,10 @@ function credentialsPath() {
 
 function deliveredPath() {
   return path.join(app.getPath("userData"), "delivered-runs.json")
+}
+
+function azureCredentialsPath() {
+  return path.join(app.getPath("userData"), "azure-speech-credential")
 }
 
 function errorMessage(error: unknown) {

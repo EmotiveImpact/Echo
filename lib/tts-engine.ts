@@ -246,6 +246,18 @@ export class TtsEngine {
     const cached = this.cache.get(key)
     if (cached) return cached
 
+    const desktopAudio = await window.hearbackDesktop?.synthesize(
+      text,
+      this.voiceURI
+    )
+    if (desktopAudio && desktopAudio.byteLength >= 64) {
+      const url = URL.createObjectURL(
+        new Blob([desktopAudio as BlobPart], { type: "audio/mpeg" })
+      )
+      this.cacheUrl(key, url)
+      return url
+    }
+
     const response = await fetch("/api/tts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -264,6 +276,11 @@ export class TtsEngine {
     const blob = await response.blob()
     if (blob.size < 64) throw new Error("The speech service returned empty audio.")
     const url = URL.createObjectURL(blob)
+    this.cacheUrl(key, url)
+    return url
+  }
+
+  private cacheUrl(key: string, url: string) {
     if (this.cache.size > 40) {
       const first = this.cache.keys().next().value
       if (first) {
@@ -273,7 +290,6 @@ export class TtsEngine {
       }
     }
     this.cache.set(key, url)
-    return url
   }
 
   private prefetch(index: number) {

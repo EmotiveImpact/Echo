@@ -4,6 +4,32 @@ Click play on a Cursor agent reply and hear it back — the same interaction Cha
 
 Cursor does not expose a public API for injecting controls into Agent chat. Hearback sits in Cursor's Browser panel, captures completed Agent messages through the supported `afterAgentResponse` hook, and plays real MP3 audio in the page.
 
+## Desktop app
+
+Hearback Desktop is the scalable application:
+
+- **Connect Cursor** opens Cursor's official browser sign-in and stores the
+  resulting credential with Electron `safeStorage` (Keychain on macOS).
+- It checks the authenticated user's Cloud Agents every 20 seconds and imports
+  new completed run results.
+- <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> reads the clipboard as a
+  guaranteed fallback.
+- <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd> opens Hearback.
+- Official Azure Speech credentials can be added in-app; they are encrypted at
+  rest. Without Azure, the alpha uses the unofficial Edge endpoint.
+
+Build the Linux alpha:
+
+```bash
+npm ci
+npm ci --prefix desktop
+npm run package:desktop:linux
+```
+
+The AppImage is written to `artifacts/desktop/`. The macOS GitHub Actions job
+builds Intel and Apple Silicon DMGs. A publicly trusted release additionally
+requires Apple signing and notarization secrets.
+
 ## How to use it with Cursor
 
 1. Keep Hearback open at `http://localhost:3000` in Cursor's Browser tab.

@@ -8,6 +8,7 @@ export type DesktopSnapshot = {
   available: boolean
   authStatus: AuthStatus
   email: string | null
+  azureConfigured: boolean
   responses: SavedReply[]
   error: string | null
 }
@@ -16,6 +17,7 @@ const serverSnapshot: DesktopSnapshot = {
   available: false,
   authStatus: "checking",
   email: null,
+  azureConfigured: false,
   responses: [],
   error: null,
 }
@@ -81,6 +83,33 @@ export async function captureDesktopClipboard() {
   return window.hearbackDesktop?.readClipboard()
 }
 
+export async function saveAzureSpeech(key: string, region: string) {
+  const bridge = window.hearbackDesktop
+  if (!bridge) return
+  try {
+    const result = await bridge.saveAzure({ key, region })
+    replace({
+      ...snapshot,
+      azureConfigured: result.configured,
+      error: null,
+    })
+  } catch (error) {
+    replace({ ...snapshot, error: message(error) })
+    throw error
+  }
+}
+
+export async function clearAzureSpeech() {
+  const bridge = window.hearbackDesktop
+  if (!bridge) return
+  const result = await bridge.clearAzure()
+  replace({
+    ...snapshot,
+    azureConfigured: result.configured,
+    error: null,
+  })
+}
+
 function initialize() {
   const bridge = window.hearbackDesktop
   if (!bridge) {
@@ -108,13 +137,13 @@ function initialize() {
     offError()
   }
 
-  void bridge
-    .cursorStatus()
-    .then((result) => {
+  void Promise.all([bridge.cursorStatus(), bridge.azureStatus()])
+    .then(([result, azure]) => {
       replace({
         ...snapshot,
         authStatus: result.status,
         email: result.email ?? null,
+        azureConfigured: azure.configured,
         error: null,
       })
     })

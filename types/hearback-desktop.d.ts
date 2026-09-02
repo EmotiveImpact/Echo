@@ -13,6 +13,13 @@ type HearbackDesktopBridge = {
   connectCursor(): Promise<CursorDesktopStatus>
   disconnectCursor(): Promise<CursorDesktopStatus>
   readClipboard(): Promise<{ captured: boolean }>
+  azureStatus(): Promise<{ configured: boolean }>
+  saveAzure(credentials: {
+    key: string
+    region: string
+  }): Promise<{ configured: boolean }>
+  clearAzure(): Promise<{ configured: boolean }>
+  synthesize(text: string, voice: string): Promise<Uint8Array | null>
   onResponse(callback: (response: SavedReply) => void): () => void
   onCursorError(callback: (message: string) => void): () => void
 }
