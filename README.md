@@ -6,8 +6,8 @@ Copy a reply in Cursor. Echo speaks it. No project skill, no type-`ski` handshak
 
 Download the latest Mac build from **[Releases](https://github.com/EmotiveImpact/Echo/releases)**.
 
-- Apple Silicon: `Echo-0.3.7-arm64-mac.zip`
-- Intel Mac: `Echo-0.3.7-x64-mac.zip`
+- Apple Silicon: `Echo-0.3.8-arm64-mac.zip`
+- Intel Mac: `Echo-0.3.8-x64-mac.zip`
 
 Unzip into **Downloads** so the app is `~/Downloads/Echo/Echo.app`. macOS will say the unsigned app is **damaged**. That is Gatekeeper, not a bad binary. Double-click **Open Echo.command**, or run:
 

@@ -91,6 +91,11 @@ enum CursorIdentity {
             if trimmed.caseInsensitiveCompare("Cursor") == .orderedSame { return true }
             if trimmed.lowercased().hasPrefix("cursor") { return true }
         }
+        if let executable = app.executableURL?.path.lowercased(),
+           executable.contains("/cursor")
+        {
+            return true
+        }
         return false
     }
 }

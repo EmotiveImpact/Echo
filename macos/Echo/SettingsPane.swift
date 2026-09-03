@@ -90,7 +90,6 @@ struct SettingsPane: View {
                                 .buttonStyle(.plain)
                                 .foregroundStyle(Color.accentColor)
                         }
-                        Toggle("Watch the clipboard", isOn: $store.settings.clipboardWatch)
                         Toggle("Autoplay new copies", isOn: $store.settings.autoplay)
                     }
 
@@ -100,7 +99,7 @@ struct SettingsPane: View {
                     }
 
                     labeled("About") {
-                        LabeledContent("Version", value: "0.3.7")
+                        LabeledContent("Version", value: "0.3.8")
                     }
                 }
                 .padding(16)

@@ -25,15 +25,24 @@ final class EchoStore: ObservableObject {
     private var chunks: [String] = []
 
     init() {
-        settings = SettingsStore.load()
-        watcher.onCopy = { [weak self] text, app in
-            self?.handleCopy(text, app: app, force: false)
+        var loaded = SettingsStore.load()
+        // Clipboard monitoring is Echo's core input. Older builds could save it
+        // as off while the visible Autoplay switch remained on.
+        loaded.clipboardWatch = true
+        settings = loaded
+        SettingsStore.save(loaded)
+        watcher.onCopy = { [weak self] text, app, cursorContext in
+            self?.handleCopy(
+                text,
+                app: app,
+                cursorContext: cursorContext,
+                force: false
+            )
         }
         watcher.start()
     }
 
     var listeningLabel: String {
-        guard settings.clipboardWatch else { return "Paused" }
         if status == .playing { return "Speaking" }
         if status == .loading { return "Fetching voice" }
         switch settings.copyMode {
@@ -53,7 +62,7 @@ final class EchoStore: ObservableObject {
         switch status {
         case .playing, .loading: return "speaker.wave.2.fill"
         case .paused: return "speaker.wave.2"
-        case .idle: return settings.clipboardWatch ? "speaker.wave.2.fill" : "speaker.slash"
+        case .idle: return "speaker.wave.2.fill"
         }
     }
 
@@ -61,13 +70,21 @@ final class EchoStore: ObservableObject {
         replies.first(where: { $0.id == activeID })
     }
 
-    func handleCopy(_ text: String, app: NSRunningApplication?, force: Bool) {
+    func handleCopy(
+        _ text: String,
+        app: NSRunningApplication?,
+        cursorContext: Bool = false,
+        force: Bool
+    ) {
         errorMessage = nil
         lastIgnoredReason = nil
 
         if !force {
-            guard settings.clipboardWatch else { return }
-            if !CopyFilter.allows(app: app, settings: settings) {
+            if !CopyFilter.allows(
+                app: app,
+                cursorContext: cursorContext,
+                settings: settings
+            ) {
                 lastIgnoredReason = ignoredReason(for: app)
                 return
             }
@@ -101,7 +118,7 @@ final class EchoStore: ObservableObject {
     func readClipboardNow() {
         let app = NSWorkspace.shared.frontmostApplication
         let text = NSPasteboard.general.string(forType: .string) ?? ""
-        handleCopy(text, app: app, force: true)
+        handleCopy(text, app: app, cursorContext: CursorIdentity.matches(app), force: true)
     }
 
     func speak(_ reply: Reply) {

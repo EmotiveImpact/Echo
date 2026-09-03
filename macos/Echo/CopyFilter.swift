@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 enum CopyFilter {
-    static let minimumLength = 48
+    static let minimumLength = 16
 
     static func shouldCapture(_ text: String, previous: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -27,15 +27,19 @@ enum CopyFilter {
         return true
     }
 
-    static func allows(app: NSRunningApplication?, settings: AppSettings) -> Bool {
-        if AppIdentity.isEcho(app) {
+    static func allows(
+        app: NSRunningApplication?,
+        cursorContext: Bool,
+        settings: AppSettings
+    ) -> Bool {
+        if AppIdentity.isEcho(app) && !cursorContext {
             return false
         }
         switch settings.copyMode {
         case .all:
             return true
         case .cursor:
-            return CursorIdentity.matches(app)
+            return cursorContext || CursorIdentity.matches(app)
         case .selected:
             guard let id = app?.bundleIdentifier else { return false }
             return settings.allowedBundleIDs.contains(id)

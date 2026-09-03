@@ -6,9 +6,11 @@ final class ClipboardWatcher {
     private var timer: DispatchSourceTimer?
     private var lastChangeCount: Int = NSPasteboard.general.changeCount
     private var lastRegularApp: NSRunningApplication?
+    private var lastCursorSeenAt: Date?
     private var activationObserver: NSObjectProtocol?
+    private var pendingAttempts = 0
 
-    var onCopy: ((String, NSRunningApplication?) -> Void)?
+    var onCopy: ((String, NSRunningApplication?, Bool) -> Void)?
 
     func start() {
         stop()
@@ -47,13 +49,27 @@ final class ClipboardWatcher {
     }
 
     private func tick() {
-        remember(NSWorkspace.shared.frontmostApplication)
+        let front = NSWorkspace.shared.frontmostApplication
+        remember(front)
         let board = NSPasteboard.general
         let count = board.changeCount
-        guard count != lastChangeCount else { return }
+        guard count != lastChangeCount || pendingAttempts > 0 else { return }
+
+        guard let text = board.string(forType: .string), !text.isEmpty else {
+            pendingAttempts += 1
+            if pendingAttempts >= 8 {
+                lastChangeCount = count
+                pendingAttempts = 0
+            }
+            return
+        }
+
         lastChangeCount = count
-        guard let text = board.string(forType: .string), !text.isEmpty else { return }
-        onCopy?(text, sourceApp())
+        pendingAttempts = 0
+        let source = sourceApp()
+        let cursorContext = CursorIdentity.matches(source)
+            || lastCursorSeenAt.map { Date().timeIntervalSince($0) < 2.0 } == true
+        onCopy?(text, source, cursorContext)
     }
 
     private func sourceApp() -> NSRunningApplication? {
@@ -66,6 +82,9 @@ final class ClipboardWatcher {
 
     private func remember(_ app: NSRunningApplication?) {
         guard let app, !AppIdentity.isEcho(app) else { return }
+        if CursorIdentity.matches(app) {
+            lastCursorSeenAt = Date()
+        }
         if app.activationPolicy == .regular || app.bundleIdentifier != nil {
             lastRegularApp = app
         }
