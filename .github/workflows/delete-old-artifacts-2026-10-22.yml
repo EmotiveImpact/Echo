@@ -1,0 +1,79 @@
+name: Delete authorised old Echo artifacts
+on:
+  push:
+    branches: [maintenance/delete-old-artifacts-2026-10-22]
+    paths: [.github/workflows/delete-old-artifacts-2026-10-22.yml]
+permissions:
+  actions: write
+  contents: read
+concurrency:
+  group: echo-old-artifact-cleanup-2026-10-22
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    if: github.repository == 'EmotiveImpact/Echo'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Delete only audited old artifacts and verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import json, os, urllib.request, urllib.error
+          from datetime import datetime, timezone
+          assert os.environ["GITHUB_REPOSITORY"] == "EmotiveImpact/Echo"
+          assert os.environ["GITHUB_REF"] == "refs/heads/maintenance/delete-old-artifacts-2026-10-22"
+          allowed = set([9874748643,9874744134,9874752026,9874748450,9857008489,9856992343,9857012830,9856999780,9855860881,9855836706,9855858724,9855831111,9852977801,9852971352,9852963495,9852960959,9849554178,9849546486,9849551487,9849546013,9848983458,9848981278,9848991237,9848974282,9848373492,9848371242,9848375699,9848374068,9848067614,9848058198,9848054321,9848044827,9845830603,9845767322,9845482870,9845472407,9844646373,9844622172,9843033434,9843031018,9843030296,9836316624,9836310682,9836308403,9834007139,9834004970,9834004569,9833276660,9833262824,9833251909])
+          base = "https://api.github.com/repos/EmotiveImpact/Echo"
+          cutoff = datetime(2026, 10, 22, tzinfo=timezone.utc)
+          def api(path, method="GET"):
+              request = urllib.request.Request(base + path, method=method, headers={
+                  "Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              })
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  data = response.read()
+                  return json.loads(data) if data else None
+          def inventory():
+              result = []
+              page = 1
+              while True:
+                  data = api("/actions/artifacts?per_page=100&page=" + str(page))
+                  result.extend(data["artifacts"])
+                  if len(data["artifacts"]) < 100:
+                      return result
+                  page += 1
+          before = inventory()
+          selected = [a for a in before if a["id"] in allowed and not a["expired"]]
+          for artifact in selected:
+              assert datetime.fromisoformat(artifact["created_at"].replace("Z", "+00:00")) < cutoff
+              run = api("/actions/runs/" + str(artifact["workflow_run"]["id"]))
+              assert run["status"] == "completed", "Refusing to delete an active run artifact"
+          deleted = []
+          for artifact in selected:
+              api("/actions/artifacts/" + str(artifact["id"]), "DELETE")
+              deleted.append({"id": artifact["id"], "name": artifact["name"], "bytes": artifact["size_in_bytes"]})
+              print("Deleted artifact " + str(artifact["id"]) + ": " + artifact["name"])
+          after = inventory()
+          remaining = [a["id"] for a in after if a["id"] in allowed and not a["expired"]]
+          receipt = {
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "deleted_count": len(deleted),
+              "deleted_bytes": sum(a["bytes"] for a in deleted),
+              "remaining_target_ids": remaining,
+              "remaining_active_artifact_count": sum(not a["expired"] for a in after),
+              "deleted": deleted,
+              "source_and_releases_untouched": True,
+          }
+          print("CLEANUP_RECEIPT=" + json.dumps(receipt, sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as output:
+              output.write("# Echo old artifact cleanup\n\n")
+              output.write("Deleted **" + str(receipt["deleted_count"]) + "** artifacts, **" + str(receipt["deleted_bytes"]) + "** bytes.\n\n")
+              output.write("Remaining targeted artifacts: " + str(len(remaining)) + ".\n\n")
+              output.write("Remaining active artifacts in repository: " + str(receipt["remaining_active_artifact_count"]) + ".\n\n")
+              output.write("Repository source, tags, releases and workflow logs were preserved.\n\n")
+              output.write("```json\n" + json.dumps(receipt, indent=2) + "\n```\n")
+          assert not remaining, "Cleanup verification failed"
+          
